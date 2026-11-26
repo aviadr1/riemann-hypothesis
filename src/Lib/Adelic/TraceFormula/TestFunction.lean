@@ -75,7 +75,9 @@ noncomputable def TestFunction.indicator {K : Subgroup G} (hK_open : IsOpen (K :
   TestFunction.clopenIndicator ⟨K.isClosed_of_isOpen hK_open, hK_open⟩ hK_compact
 
 omit [T2Space G] in
-@[simp] lemma TestFunction.indicator_apply_eq_indicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
+/-- The subgroup indicator test function evaluates to the characteristic function of `K`. -/
+@[simp]
+lemma TestFunction.indicator_apply_eq_indicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
     (hK_compact : IsCompact (K : Set G)) (x : G) :
     (indicator hK_open hK_compact : G → ℂ) x = Set.indicator K 1 x := rfl
 
