@@ -1,0 +1,85 @@
+name: Lake import visitation experiment
+on:
+  push:
+    branches: [codex/lake-import-sets]
+permissions:
+  contents: read
+jobs:
+  compare:
+    name: Compare the module setup implementations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ELAN_TOOLCHAIN: leanprover/lean4:v4.37.0-rc1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: leanprover/lean4
+          ref: v4.37.0-rc1
+          persist-credentials: false
+          sparse-checkout: |
+            src/lake
+            tests/lake_bench/inundation
+      - name: Install Lean
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --no-modify-path --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+      - name: Build two Lake executables with the same compiler and flags
+        run: |
+          for variant in baseline candidate; do
+            cp -R src/lake "$RUNNER_TEMP/$variant"
+            cat > "$RUNNER_TEMP/$variant/lakefile.toml" <<'TOML'
+          name = "lake-ab"
+          bootstrap = true
+
+          [[lean_lib]]
+          name = "Lake"
+          globs = ["Lake.*"]
+
+          [[lean_exe]]
+          name = "lake"
+          root = "LakeMain"
+          moreLinkArgs = ["-lLeanExport"]
+          TOML
+          done
+          mod="$RUNNER_TEMP/candidate/Lake/Build/Module.lean"
+          test "$(grep -c 'allVisited metaVisited : NameSet' "$mod")" = 1
+          sed -i '/^import Init.Omega$/a import Std.Data.HashSet' "$mod"
+          sed -i 's/allVisited metaVisited : NameSet/allVisited metaVisited : Std.HashSet Name/' "$mod"
+          diff -u "$RUNNER_TEMP/baseline/Lake/Build/Module.lean" "$mod" || test "$?" -eq 1
+          for variant in baseline candidate; do
+            lake -d "$RUNNER_TEMP/$variant" build lake
+            "$RUNNER_TEMP/$variant/.lake/build/bin/lake" self-check
+          done
+      - name: Measure both binaries against identical cached modules
+        working-directory: tests/lake_bench/inundation
+        run: |
+          opts=(-Klayers=24 -Kwidth=44)
+          lake "${opts[@]}" run mkBuild
+          lake "${opts[@]}" build
+          metrics="$RUNNER_TEMP/lake-import-sets.tsv"
+          printf 'variant\tsample\twall_seconds\tuser_seconds\tsystem_seconds\tmax_rss_kib\n' > "$metrics"
+          for sample in {0..7}; do
+            variants=(baseline candidate)
+            if (( sample % 2 )); then variants=(candidate baseline); fi
+            for variant in "${variants[@]}"; do
+              binary="$RUNNER_TEMP/$variant/.lake/build/bin/lake"
+              /usr/bin/time -f "$variant\t$sample\t%e\t%U\t%S\t%M" -a -o "$metrics" \
+                "$binary" "${opts[@]}" --no-build build setups
+            done
+          done
+          cat "$metrics"
+          { echo '```'; cat "$metrics"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+  run-link:
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=success -f context='Lake experiment / run link' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
