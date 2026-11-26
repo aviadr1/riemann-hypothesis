@@ -159,20 +159,25 @@ setup of all three is in `scripts/runner/`:
 Each host can serve its ephemeral jobs a read-only Lean dependency seed at
 `/opt/rh-runner/lean-seed`. In a clean checkout of a **trusted main revision**, use the
 same Linux image and architecture as the runner and run the following as an unprivileged
-image-builder account, without Git credentials:
+image-builder account, without Git credentials. With Elan on `PATH`, give this checkout
+its own toolchain store:
 
 ```sh
+export ELAN_HOME="$PWD/.elan"
+elan toolchain install "$(cat lean-toolchain)"
 MATHLIB_CACHE_GET_URL=https://cache.mathlib.org/mathlib4 lake exe mathlib/cache get
 python3 scripts/tauceti-cache-get.py
 ```
 
 After both commands succeed, publish the checkout at that path (or switch a symlink to it
 atomically). The runner users need read access and must have no write access to the seed
-or its parents. Keep the previous target until jobs using it finish. Put the seed on the
+or its parents. Keep it outside home directories hidden by the job's systemd sandbox,
+and keep the previous target until jobs using it finish. Put the seed on the
 same reflink-capable filesystem as the runner homes for fast copy-on-write copies.
 
-CI-esta copies only `.lake/packages` into the fresh workspace when the toolchain, Lake
-configuration and dependency manifest match. With a missing or mismatched seed the job
+CI-esta copies `.lake/packages` into the fresh workspace when the toolchain, Lake
+configuration and dependency manifest match. It also links the seed's installed Lean
+toolchain into a private Elan home. Elan still selects the version in `lean-toolchain`. With a missing or mismatched seed the job
 fetches Mathlib as usual. Tau Ceti's pin and statement-import checks run on every build.
 Lake checks the current set of Tau Ceti imports and fetches any missing outputs. The
 project cache, proof build, sorry scan and five axiom checks follow as before.
