@@ -31,9 +31,10 @@ build inputs; `lake exe cache get` then says that no cache matches.
 
 ## Pull request checks
 
-On a pull request, the required `lake build` job compares the tested merge checkout to its
+On a pull request, a GitHub-hosted job compares the tested merge checkout to its
 exact base. For changes confined to the listed documentation, PR automation or script tests,
-it can reuse the successful merge-queue proof check for that base on `rh-big`. Without that
+it can reuse the successful merge-queue proof check for that base on `rh-big`. These PRs
+finish the required `lake build` check on GitHub-hosted runners. Without that
 evidence it builds as usual. A proof, toolchain, cache or unfamiliar file change takes the
 normal build path. Merge groups still run the proof and axiom checks and produce cache artifacts.
 
@@ -59,8 +60,8 @@ baseline. `python3 -I scripts/tests/test_ci_cache_baseline.py` tests the selecti
 
 ## CI
 
-Pull requests land through GitHub's merge queue. `.github/workflows/build.yml` has one job,
-`lake build`, the queue's required check. It checks every pull request to `main` from a fork on
+Pull requests land through GitHub's merge queue. In `.github/workflows/build.yml`,
+`lake build` is the queue's required check. When a build is needed, it checks fork PRs on
 the self-hosted `rh-pr-fork` runners, every pull request from a branch of this repository not
 starting with `batch/` on the self-hosted `rh-pr-trusted` runners, and every merge queue group
 (`merge_group`), push to `main`, manual run and pull request from a `batch/` branch of this
