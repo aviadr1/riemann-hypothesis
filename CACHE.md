@@ -169,7 +169,7 @@ MATHLIB_CACHE_GET_URL=https://cache.mathlib.org/mathlib4 lake exe mathlib/cache 
 python3 scripts/tauceti-cache-get.py
 ```
 
-After both commands succeed, publish the checkout at that path (or switch a symlink to it
+After provisioning succeeds, publish the checkout at that path (or switch a symlink to it
 atomically). The runner users need read access and must have no write access to the seed
 or its parents. Keep it outside home directories hidden by the job's systemd sandbox,
 and keep the previous target until jobs using it finish. Put the seed on the
@@ -181,6 +181,14 @@ toolchain into a private Elan home. Elan still selects the version in `lean-tool
 fetches Mathlib as usual. Tau Ceti's pin and statement-import checks run on every build.
 Lake checks the current set of Tau Ceti imports and fetches any missing outputs. The
 project cache, proof build, sorry scan and five axiom checks follow as before.
+The job keeps Lake's writable artifact cache in its own workspace when it uses a
+linked toolchain.
+
+On the fork's hosted Linux benchmark with Btrfs, the same batch proof passed its
+build and five axiom checks in 110 seconds with the seed and in 234 seconds with
+normal hydration, measured from the start of checkout. Preparing the seed took
+195 seconds once per image. On the ordinary ext4 benchmark the gain was smaller.
+See [the paired benchmark](https://github.com/aviadr1/riemann-hypothesis/actions/runs/45881900524).
 
 ## Tau Ceti
 
