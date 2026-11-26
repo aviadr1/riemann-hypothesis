@@ -203,11 +203,9 @@ structure DescentPair extends LevelPlaces E where
 
 variable {E r n} in
 open scoped Classical in
-/-- The finite datum of the descent of a point form, as a function of families `X` of matrices over
-the residue fields at the places of `O`. If `X` equals `Y` at every place of `O.ChosenIndex`, it is
-the product over the places `w` of `O.TwistIndex` of `O.tamePart w` of the determinant of the rows
-`e` of `X` at `w`; otherwise it is `0`. Here `O.tamePart w` is the character of the residue field at
-`w` given by `O`. -/
+/-- The point-form datum for residue matrices `X`. When `X` agrees with `Y` at the chosen places,
+it is the product of the tame characters on the determinants of the rows `e` at the twist places.
+It is zero otherwise. -/
 noncomputable def Rows.pointFormDatum {O : DescentPair E r n}
     (Y : ∀ i : O.ChosenIndex, Matrix n r (ResField (O.placeAt (Sum.inl i)))) (e : r ↪ n)
     (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex, Matrix n r (ResField (O.placeAt i))) : ℂ :=
@@ -228,9 +226,8 @@ of the other basis vectors. -/
 abbrev levelGroup : Subgroup (Gf E n) := levelOf O.placeAt
   (descentResidueLevel O.toLevelPlaces O.incl)
 
-/-- The block datum Ψ_bl as a function of families X of residue matrices: it is the product over
-w ∈ Q of ψ_w(det of the rows of X_w indexed by `incl`) if X_w is the inclusion matrix of `incl` at
-every w in M, else 0. -/
+/-- The block datum Ψ_bl is `Rows.pointFormDatum` with the inclusion matrices at the chosen
+places and the rows indexed by `O.incl`. -/
 def residueBlockDatum (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex,
   Matrix n r (ResField (O.placeAt i))) : ℂ :=
   Rows.pointFormDatum (O := O) (fun i ↦ inclMatrix (ResField (O.placeAt (inl i))) O.incl) O.incl X
