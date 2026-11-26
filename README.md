@@ -63,7 +63,7 @@ Contributors can use [dry-lint](https://github.com/gigaverse-app/dry-lint) to fi
 different files under `src/`. From the repository root, run:
 
 ```sh
-uvx --from 'dry-lint[lean]>=1,<2' dry-lint scan --limit 20
+uvx --from 'dry-lint[lean]>=1.13,<2' dry-lint scan --limit 20
 ```
 
 To review the declarations changed on a branch, replace `scan --limit 20` with `check --base origin/main`.
