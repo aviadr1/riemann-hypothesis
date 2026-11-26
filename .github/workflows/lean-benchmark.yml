@@ -1,7 +1,7 @@
 name: Lean dependency benchmark
 on:
   push:
-    branches: [codex/lean-seed-ext4]
+    branches: [codex/lean-seed-miss]
 permissions:
   contents: read
 jobs:
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [cold, seeded]
+        mode: [missing]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -74,11 +74,10 @@ jobs:
         run: python3 -I scripts/tests/test_ci_cache_baseline.py
 
       - name: Restore prehydrated Lean packages
-        if: matrix.mode == 'seeded'
         uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
         id: seed1
         with:
-          seed-directory: /mnt/bench/seed
+          seed-directory: /opt/rh-runner/lean-seed
       - name: Restore Mathlib's cache
         if: steps.seed1.outputs.cache-hit != 'true'
         # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
@@ -142,13 +141,9 @@ jobs:
           HIT: ${{ steps.seed1.outputs.cache-hit }}
         run: |
           test "$(git rev-parse HEAD:src)" = 353028242054cc524485e472782ff1b062ae82ec
-          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
-      - name: Check that a bad proof still fails on a seed hit
-        if: matrix.mode == 'seeded'
+          test "$HIT" = false
+      - name: Check that warmed packages still enforce statement imports
         run: |
-          printf '\nexample : False := True.intro\n' >> src/Main.lean
-          if lake build > "$RUNNER_TEMP/invalid-proof.log" 2>&1; then
-            echo "::error::The invalid proof passed."
-            exit 1
-          fi
-          grep -E 'error:.*Main.lean|Main.lean:.*error|Type mismatch' "$RUNNER_TEMP/invalid-proof.log"
+          printf '\nimport TauCeti.Example\n' >> Challenge.lean
+          if python3 scripts/tauceti-cache-get.py > "$RUNNER_TEMP/invalid-import.log" 2>&1; then exit 1; fi
+          grep 'Challenge.lean imports a Tau Ceti module' "$RUNNER_TEMP/invalid-import.log"
