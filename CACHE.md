@@ -177,7 +177,7 @@ same reflink-capable filesystem as the runner homes for fast copy-on-write copie
 
 CI-esta copies `.lake/packages` into the fresh workspace when the toolchain, Lake
 configuration and dependency manifest match. It also links the seed's installed Lean
-toolchain into a private Elan home. Elan still selects the version in `lean-toolchain`. With a missing or mismatched seed the job
+toolchain into a private Elan home. Elan selects the version in `lean-toolchain`, and Lake writes new cache entries to the private `.lake/cache` directory. With a missing or mismatched seed the job
 fetches Mathlib as usual. Tau Ceti's pin and statement-import checks run on every build.
 Lake checks the current set of Tau Ceti imports and fetches any missing outputs. The
 project cache, proof build, sorry scan and five axiom checks follow as before.
