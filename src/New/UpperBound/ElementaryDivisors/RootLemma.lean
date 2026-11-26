@@ -324,11 +324,7 @@ lemma cast_card_pos [NeZero N] : (0 : ℝ) < D.card :=
 @[simp] lemma varX_ne_varY (s t : ZMod N) : D.varX s ≠ D.varY t := by
   intro h
   obtain rfl : s = t := congrArg Prod.snd h
-  have h1 := congrArg Prod.fst h
-  simp only [varX, varY, rootVar] at h1
-  split_ifs at h1
-  · exact D.ne h1
-  · exact D.ne h1.symm
+  by_cases hs : T.isEven s <;> simp [varX, varY, rootVar, hs, D.ne, D.ne.symm] at h
 
 @[simp] lemma varY_ne_varX (s t : ZMod N) : D.varY s ≠ D.varX t := (D.varX_ne_varY t s).symm
 
@@ -337,14 +333,12 @@ lemma cast_card_pos [NeZero N] : (0 : ℝ) < D.card :=
 
 @[simp] lemma swapVar_snd : (D.swapVar z).2 = z.2 := rfl
 
+/-- Swapping the two root variables is an involution. -/
 @[simp] lemma swapVar_swapVar : D.swapVar (D.swapVar z) = z :=
   Prod.ext (Equiv.swap_apply_self ..) rfl
 
 @[simp] lemma swapVar_varX : D.swapVar (D.varX s) = D.varY s := by
-  simp only [swapVar, varX, varY, rootVar]
-  split_ifs
-  · exact Prod.ext (Equiv.swap_apply_left _ _) rfl
-  · exact Prod.ext (Equiv.swap_apply_right _ _) rfl
+  by_cases hs : T.isEven s <;> simp [swapVar, varX, varY, rootVar, hs]
 
 @[simp] lemma swapVar_varY : D.swapVar (D.varY s) = D.varX s := by
   rw [← D.swapVar_varX (s := s), swapVar_swapVar]
@@ -354,19 +348,13 @@ lemma var_cases (z : Fin k × ZMod N) : z = D.varY D.letter ∨ z = D.varX D.let
     (∃ s : ZMod N, s ≠ D.letter ∧ (z = D.varY s ∨ z = D.varX s)) ∨ D.IsFixed z := by
   by_cases hz : D.IsFixed z
   · exact .inr (.inr (.inr hz))
-  · have h_fst : z.1 = D.fst ∨ z.1 = D.snd := by
-      by_contra h
-      exact hz ⟨fun h1 ↦ h (.inl h1), fun h2 ↦ h (.inr h2)⟩
-    have h_letter : z = D.varY z.2 ∨ z = D.varX z.2 := by
-      simp only [varX, varY, rootVar, Prod.ext_iff, and_true]
-      split_ifs
-      · exact h_fst.symm
-      · exact h_fst
-    by_cases hs : z.2 = D.letter
-    · rcases h_letter with h | h
-      · exact .inl (by rwa [← hs])
-      · exact .inr (.inl (by rwa [← hs]))
-    · exact .inr (.inr (.inl ⟨z.2, hs, h_letter⟩))
+  have h_letter : z = D.varY z.2 ∨ z = D.varX z.2 := by
+    unfold IsFixed at hz
+    by_cases hs : T.isEven z.2 <;> simp [varX, varY, rootVar, hs, Prod.ext_iff] <;> tauto
+  by_cases hs : z.2 = D.letter
+  · rw [hs] at h_letter
+    tauto
+  · exact .inr (.inr (.inl ⟨z.2, hs, h_letter⟩))
 
 @[simp] lemma sign_varX : D.sign (D.varX s) = 0 := by
   simp only [sign, varX_snd, varX_ne_varY, ↓reduceIte]
