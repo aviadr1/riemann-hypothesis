@@ -63,23 +63,16 @@ def TestFunction.translate : Representation ℂ (G × G) (TestFunction G) where
 @[simp] lemma TestFunction.translate_apply (g : G × G) (f : TestFunction G) (x : G) :
     (translate g f : G → ℂ) x = (f : G → ℂ) (g.1⁻¹ * x * g.2) := rfl
 
-/-- The characteristic function of a compact open set. -/
-noncomputable def TestFunction.setIndicator {Y : Type} [TopologicalSpace Y] [T2Space Y]
-    {V : Set Y} (hV_open : IsOpen V)
-    (hV_compact : IsCompact V) : TestFunction Y :=
-  ⟨V.indicator 1,
-    (LocallyConstant.indicator 1 ⟨hV_compact.isClosed, hV_open⟩).isLocallyConstant,
-    HasCompactSupport.intro hV_compact fun _ hy ↦ Set.indicator_of_notMem hy _, Set.subset_univ _⟩
-
-/-- The characteristic function of `V`, as a test function, is `V.indicator 1`. -/
-@[simp] lemma TestFunction.setIndicator_apply {Y : Type} [TopologicalSpace Y] [T2Space Y]
-    {V : Set Y} (hV_open : IsOpen V) (hV_compact : IsCompact V) (y : Y) :
-    (setIndicator hV_open hV_compact).val y = V.indicator 1 y := rfl
+/-- The characteristic function of a compact clopen set, as a test function. -/
+noncomputable def TestFunction.clopenIndicator {Y : Type} [TopologicalSpace Y] {V : Set Y}
+    (hV : IsClopen V) (hc : IsCompact V) : TestFunction Y :=
+  ⟨V.indicator 1, (LocallyConstant.indicator 1 hV).isLocallyConstant,
+    HasCompactSupport.intro' hc hV.1 fun _ hy ↦ Set.indicator_of_notMem hy _, Set.subset_univ _⟩
 
 /-- The characteristic function of a compact open subgroup. -/
 noncomputable def TestFunction.indicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
     (hK_compact : IsCompact (K : Set G)) : TestFunction G :=
-  TestFunction.setIndicator hK_open hK_compact
+  delta% TestFunction.clopenIndicator ⟨K.isClosed_of_isOpen hK_open, hK_open⟩ hK_compact
 
 /-- The linear map `a ↦ a ⋆ 1_K` from the group algebra to the test functions, for a compact open
 subgroup `K`: the group element `b` goes to the characteristic function of the coset `b K`. -/

@@ -112,6 +112,15 @@ lemma TestFunction.integrable_prodMk_left [MeasurableSpace Y] [OpensMeasurableSp
   TestFunction.integrable ⟨fun y : Y ↦ Ψ.val (y, z),
     schwartzBruhat.comp Ψ.2 Prod.fst (fun _ ↦ rfl) (mapsTo_univ _ _) (by fun_prop) continuous_fst⟩ μ
 
+/-- The characteristic function of a compact open set. -/
+noncomputable def TestFunction.setIndicator {V : Set Y} (hV_open : IsOpen V)
+    (hV_compact : IsCompact V) : TestFunction Y :=
+  TestFunction.clopenIndicator ⟨hV_compact.isClosed, hV_open⟩ hV_compact
+
+/-- The characteristic function of `V`, as a test function, is `V.indicator 1`. -/
+lemma TestFunction.setIndicator_apply {V : Set Y} (hV_open : IsOpen V) (hV_compact : IsCompact V)
+    (y : Y) : (setIndicator hV_open hV_compact).val y = V.indicator 1 y := rfl
+
 end Space
 
 section Extension
@@ -164,7 +173,7 @@ theorem TestFunction.exists_extension {G : Type} [Group G] [TopologicalSpace G]
     obtain ⟨V, hV_open, hV_compact, hV⟩ :=
       exists_isCompact_isOpen_preimage_eq hC (hF_const.isOpen_fiber c) h_level
     exact ⟨c • setIndicator hV_open hV_compact, fun x ↦ by
-      simp [indicator_apply, hV x]⟩
+      simp [setIndicator_apply, indicator_apply, hV x]⟩
   choose a ha using h_part
   obtain ⟨values, h_values⟩ := hF_compact.isCompact.elim_finite_subcover _ hF_const.isOpen_fiber
     fun x _ ↦ mem_iUnion.2 ⟨F.val x, rfl⟩
