@@ -340,7 +340,8 @@ lemma normalizedDescent_classForm_mul [WeilData E]
             ((T.map (levelResidueAt (inr i))).submatrix O.incl id).det
         else 0) := by
     funext T
-    simp only [DescentPair.residueBlockDatum, ← V.genResidue_smul_eq_inclMatrix_iff]
+    simp only [DescentPair.residueBlockDatum, Rows.pointFormDatum,
+      ← V.genResidue_smul_eq_inclMatrix_iff]
   have h_lift :
       (fun x : n × r → 𝔸f E ↦
         (O.levelModulus 2).liftFn

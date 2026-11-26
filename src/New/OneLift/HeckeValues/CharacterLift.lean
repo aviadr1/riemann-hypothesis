@@ -680,7 +680,8 @@ lemma LValueData.map_pairWeilFinite_blockDatum {P : Parameters} {s : ℕ} {n : T
     obtain ⟨S, d, μ, ψ, hμ_weight, h_card, hψ_unramified⟩ := Y
     obtain rfl : S = X.toLevelPlaces := hY_places
     ext x
-    simp [ΨX, ΨY, univ_eq_empty, residueDatum, DescentPair.residueBlockDatum, apply_ite σ]
+    simp [ΨX, ΨY, univ_eq_empty, residueDatum, DescentPair.residueBlockDatum,
+      Rows.pointFormDatum, apply_ite σ]
   have h_datum : L X.descentPair.blockDatum.val =
       l • V.ω (1, scalarFin (n × Unit) z) Y.descentPair.blockDatum.val := by
     rw [hX_block, hY_block, ← hΨ_conj]

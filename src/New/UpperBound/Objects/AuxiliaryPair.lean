@@ -201,6 +201,21 @@ structure DescentPair extends LevelPlaces E where
   /-- `W` has smaller rank than `V`: `r < n`. -/
   rank_lt : card r < card n
 
+variable {E r n} in
+open scoped Classical in
+/-- The finite datum of the descent of a point form, as a function of families `X` of matrices over
+the residue fields at the places of `O`. If `X` equals `Y` at every place of `O.ChosenIndex`, it is
+the product over the places `w` of `O.TwistIndex` of `O.tamePart w` of the determinant of the rows
+`e` of `X` at `w`; otherwise it is `0`. Here `O.tamePart w` is the character of the residue field at
+`w` given by `O`. -/
+noncomputable def Rows.pointFormDatum {O : DescentPair E r n}
+    (Y : ∀ i : O.ChosenIndex, Matrix n r (ResField (O.placeAt (Sum.inl i)))) (e : r ↪ n)
+    (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex, Matrix n r (ResField (O.placeAt i))) : ℂ :=
+  if ∀ i : O.ChosenIndex, X (Sum.inl i) = Y i then
+    ∏ i : O.TwistIndex, O.tamePart (O.placeAt (Sum.inr i)) ((X (Sum.inr i)).submatrix e id).det
+  else
+    0
+
 namespace DescentPair
 
 attribute [instance] hasWeight
@@ -213,15 +228,12 @@ of the other basis vectors. -/
 abbrev levelGroup : Subgroup (Gf E n) := levelOf O.placeAt
   (descentResidueLevel O.toLevelPlaces O.incl)
 
-open scoped Classical in
 /-- The block datum Ψ_bl as a function of families X of residue matrices: it is the product over
 w ∈ Q of ψ_w(det of the rows of X_w indexed by `incl`) if X_w is the inclusion matrix of `incl` at
 every w in M, else 0. -/
 def residueBlockDatum (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex,
   Matrix n r (ResField (O.placeAt i))) : ℂ :=
-  if ∀ i : O.ChosenIndex, X (Sum.inl i) = inclMatrix (ResField (O.placeAt (inl i))) O.incl then
-    ∏ i : O.TwistIndex, O.tamePart (O.placeAt (inr i)) ((X (Sum.inr i)).submatrix O.incl id).det
-  else 0
+  Rows.pointFormDatum (O := O) (fun i ↦ inclMatrix (ResField (O.placeAt (inl i))) O.incl) O.incl X
 
 /-- The column numbers (τ, i) ↦ k⁺(τ, i) + k⁻(τ, n − i) of the highest weight of the forms on
 V = I_n, with n the rank of V. -/
@@ -522,7 +534,7 @@ lemma DescentPair.residueBlockDatum_eq_sum
           ∀ i : O.TwistIndex, (X (.inr i)).submatrix O.incl id = (A i).val then
         ∏ i : O.TwistIndex, O.tamePart (O.placeAt (.inr i)) (A i).val.det
       else 0 := by
-  rw [residueBlockDatum]
+  rw [residueBlockDatum, Rows.pointFormDatum]
   by_cases h_blocks : ∀ i : O.TwistIndex, IsUnit ((X (.inr i)).submatrix O.incl id)
   · -- All blocks are invertible: only the family `A` of these blocks contributes.
     choose A hA using h_blocks
@@ -606,7 +618,7 @@ lemma DescentPair.residueBlockDatum_inv_mul_mul
       O.tamePart (O.placeAt (.inr i)) ((j.val (.inr i))⁻¹.val.submatrix O.incl O.incl).det := by
     rw [← inv_inv j, map_inv, inv_inv]
     simp [residueLevelChar, inv_apply_eq_inv', -Sum.elim_inr]
-  rw [residueBlockDatum, residueBlockDatum, mul_ite, mul_zero]
+  simp only [residueBlockDatum, Rows.pointFormDatum, mul_ite, mul_zero]
   refine if_congr (forall_congr' h_support) ?_ rfl
   simp only [h_block, h_char, det_mul, map_mul, prod_mul_distrib]
   ring
