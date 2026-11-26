@@ -32,7 +32,6 @@ jobs:
             cp -R src/lake "$RUNNER_TEMP/$variant"
             cat > "$RUNNER_TEMP/$variant/lakefile.toml" <<'TOML'
           name = "lake-ab"
-          bootstrap = true
 
           [[lean_lib]]
           name = "Lake"
