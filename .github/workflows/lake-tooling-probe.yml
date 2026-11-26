@@ -69,3 +69,18 @@ jobs:
           CONFIG
           pipx run --spec 'dry-lint[lean]==1.13.0' dry-lint scan --limit 20 | tee "$RUNNER_TEMP/lake-dry-lint.txt"
           { echo '```'; cat "$RUNNER_TEMP/lake-dry-lint.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+  run-link:
+    name: Link the benchmark run from its commit
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+    steps:
+      - name: Publish the benchmark URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=success \
+            -f context='Lake tooling probe / run link' \
+            -f description='Open the run to see benchmark and scan results' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
