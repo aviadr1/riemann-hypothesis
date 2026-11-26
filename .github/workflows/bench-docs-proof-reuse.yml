@@ -1,0 +1,48 @@
+name: Replay documentation proof reuse
+on:
+  push:
+    branches: [codex/bench-docs-proof-reuse]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      tested: ${{ steps.scope.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: leanprover-community/riemann-hypothesis
+          ref: 1463e6a5fc603119429ece360a729f30f03198cd
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aviadr1/riemann-hypothesis
+          ref: d4d921b94a42a235b05d3ce8c72b257116565c8b
+          path: policy
+          persist-credentials: false
+      - id: scope
+        name: Classify the historical merge against its actual base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          GITHUB_REPOSITORY=leanprover-community/riemann-hypothesis python3 -I policy/scripts/ci-github.py pr-checks --sha 5f593811a7ac880c5eb755aee7802eb82c29411c
+          grep -Fx tests=full "$GITHUB_OUTPUT"
+      - name: Run the proposed full script suite
+        working-directory: policy
+        run: python3 -I -m unittest discover -s scripts/tests
+  build:
+    name: lake build
+    needs: preflight
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify proof reuse and successful script checks
+        env:
+          RESULT: ${{ needs.preflight.result }}
+          TESTED: ${{ needs.preflight.outputs.tested }}
+        run: |
+          test "$RESULT" = success
+          test "$TESTED" = true
