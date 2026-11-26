@@ -21,6 +21,7 @@ class PullRequestChecks(unittest.TestCase):
             (["src/Lib/A.lean", "scripts/batch-labels.py"], (False, "affected")),
             (["scripts/ci-cache-get.py"], (False, "affected")),
             (["scripts/tests/.gv-dependencies.yaml", "README.md"], (False, "policy")),
+            (["scripts/tests/selective.json"], (False, "policy")),
             (["scripts/PrintAxioms.lean", "INDEX.md"], (False, "full")),
         ]:
             with self.subTest(paths=paths):

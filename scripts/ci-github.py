@@ -138,7 +138,9 @@ AUTOMATION = {
 
 def pr_scope(changed):
     """Return whether proof reuse is eligible, and which script tests to run."""
-    if any(p.endswith((".gv-dependency.yaml", ".gv-dependencies.yaml")) for p in changed):
+    if "scripts/tests/selective.json" in changed or any(
+        p.endswith((".gv-dependency.yaml", ".gv-dependencies.yaml")) for p in changed
+    ):
         return False, "policy"
     proof = {p for p in changed if p.startswith("src/") and p.endswith(".lean")}
     tests = {p for p in changed if re.fullmatch(r"scripts/tests/test_\w+\.py", p)}

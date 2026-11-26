@@ -85,13 +85,18 @@ jobs:
             # The manifests describe filename-based imports and workflow reads.
             # The full suite uses only the standard library and works offline.
             envdir="$RUNNER_TEMP/script-tests"
-            if python3 -m venv "$envdir" && "$envdir/bin/python" -m pip install --disable-pip-version-check 'pytest-selective==1.9.1'; then
+            model=scripts/tests/selective.json
+            if python3 -m venv "$envdir" && "$envdir/bin/python" -m pip install --disable-pip-version-check 'pytest-selective==1.10.0'; then
               if [[ "$TESTS" == policy ]]; then
-                # Plan once to validate the declarations, then run the full suite.
-                "$envdir/bin/python" -I -m pytest -q --rootdir=. --selective --selective-base="$BASE" --collect-only scripts/tests
-                exec "$envdir/bin/python" -I -m unittest discover -s scripts/tests
+                # Observe module loads from source as well as the files each test reads.
+                audit=$(mktemp -d "$RUNNER_TEMP/script-audit.XXXXXXXX")
+                "$envdir/bin/python" -I -B -X "pycache_prefix=$audit/bytecode" -m pytest -q --rootdir=. \
+                  --no-selective -p pytest_selective.impact_audit_plugin --impact-audit-dir "$audit/reads" scripts/tests
+                "$envdir/bin/python" -I -m pytest_selective.impact_cli audit --config "$model" \
+                  --records "$audit/reads" --cache "$audit/graph.sqlite3" --output "$audit/report.json"
+                exec "$envdir/bin/python" -I -c 'import json, sys; sys.exit(bool(json.load(sys.stdin)["recorder_errors"]))' < "$audit/report.json"
               fi
-              exec "$envdir/bin/python" -I -m pytest -q --rootdir=. --selective --selective-base="$BASE" scripts/tests
+              exec "$envdir/bin/python" -I -m pytest -q --rootdir=. --selective --selective-config="$model" --selective-base="$BASE" scripts/tests
             fi
             if [[ "$TESTS" == policy ]]; then
               echo "::error::Validating changed dependency declarations requires pytest-selective"

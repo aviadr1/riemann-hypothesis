@@ -40,9 +40,10 @@ normal build path. Merge groups still run the proof and axiom checks and produce
 
 The same job runs affected Python tests for PR automation edits. The `.gv-dependencies.yaml`
 files in `scripts/` and `scripts/tests/` describe the modules loaded by filename and the
-workflow YAML read by the label tests. To reproduce selection from the repository root with
-`pytest-selective==1.9.1` installed, run
-`python -m pytest --rootdir=. --selective --selective-base=origin/main scripts/tests`.
+workflow YAML read by the label tests. A PR changing those declarations or their configuration
+runs all script tests and checks that the graph covers the tracked files the recorder observed.
+To reproduce selection from the repository root with `pytest-selective==1.10.0` installed, run
+`python -m pytest --rootdir=. --selective --selective-config=scripts/tests/selective.json --selective-base=origin/main scripts/tests`.
 Use `python -I -m unittest discover -s scripts/tests` for the full suite.
 
 ## Baseline
