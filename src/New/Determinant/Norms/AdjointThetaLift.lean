@@ -414,7 +414,7 @@ lemma DescentPair.isSharp_blockDatum [WeilData E]
   have h_sq (x : Matrix n r (O.levelModulus 1).ResidueRing) :
       star (blockFn x) * blockFn x = ∏ i, ind i (e x i) := by
     dsimp only [blockFn]
-    rw [residueBlockDatum, Rows.pointFormDatum, prod_sum_type]
+    rw [residueBlockDatum, prod_sum_type]
     split_ifs with h_chosen
     · have h_one : ∏ i, ind (.inl i) (e x (.inl i)) = 1 :=
         Finset.prod_eq_one fun i _ ↦ ite_eq_left (h_chosen i)
@@ -473,7 +473,7 @@ lemma DescentPair.isSharp_blockDatum [WeilData E]
         simpa [← h_vac, pairWeil_apply, Prod.mk_one_one] using h_law
       exists_mul_eq := ⟨(inclMatrix (O.levelModulus 1).ResidueRing O.incl)ᵀ, fun x hx ↦ by
         dsimp only [blockFn] at hx
-        rw [residueBlockDatum, Rows.pointFormDatum, ite_ne_right_iff, prod_ne_zero_iff] at hx
+        rw [residueBlockDatum, ite_ne_right_iff, prod_ne_zero_iff] at hx
         let block (i : O.ChosenIndex ⊕ O.TwistIndex) : Matrix r r (ResField (O.placeAt i)) :=
           (x.map (levelResidueAt i)).submatrix O.incl id
         have h_ch (i : O.ChosenIndex) : block (.inl i) = 1 := by

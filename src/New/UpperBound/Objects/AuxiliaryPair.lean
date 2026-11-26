@@ -230,7 +230,8 @@ abbrev levelGroup : Subgroup (Gf E n) := levelOf O.placeAt
 places and the rows indexed by `O.incl`. -/
 def residueBlockDatum (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex,
   Matrix n r (ResField (O.placeAt i))) : ℂ :=
-  Rows.pointFormDatum (O := O) (fun i ↦ inclMatrix (ResField (O.placeAt (inl i))) O.incl) O.incl X
+  delta% Rows.pointFormDatum (O := O)
+    (fun i ↦ inclMatrix (ResField (O.placeAt (inl i))) O.incl) O.incl X
 
 /-- The column numbers (τ, i) ↦ k⁺(τ, i) + k⁻(τ, n − i) of the highest weight of the forms on
 V = I_n, with n the rank of V. -/
@@ -531,7 +532,7 @@ lemma DescentPair.residueBlockDatum_eq_sum
           ∀ i : O.TwistIndex, (X (.inr i)).submatrix O.incl id = (A i).val then
         ∏ i : O.TwistIndex, O.tamePart (O.placeAt (.inr i)) (A i).val.det
       else 0 := by
-  rw [residueBlockDatum, Rows.pointFormDatum]
+  rw [residueBlockDatum]
   by_cases h_blocks : ∀ i : O.TwistIndex, IsUnit ((X (.inr i)).submatrix O.incl id)
   · -- All blocks are invertible: only the family `A` of these blocks contributes.
     choose A hA using h_blocks
@@ -615,7 +616,7 @@ lemma DescentPair.residueBlockDatum_inv_mul_mul
       O.tamePart (O.placeAt (.inr i)) ((j.val (.inr i))⁻¹.val.submatrix O.incl O.incl).det := by
     rw [← inv_inv j, map_inv, inv_inv]
     simp [residueLevelChar, inv_apply_eq_inv', -Sum.elim_inr]
-  simp only [residueBlockDatum, Rows.pointFormDatum, mul_ite, mul_zero]
+  rw [residueBlockDatum, residueBlockDatum, mul_ite, mul_zero]
   refine if_congr (forall_congr' h_support) ?_ rfl
   simp only [h_block, h_char, det_mul, map_mul, prod_mul_distrib]
   ring

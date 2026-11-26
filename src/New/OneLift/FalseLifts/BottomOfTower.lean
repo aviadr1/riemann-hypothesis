@@ -741,8 +741,8 @@ lemma residueBlockDatum_mul (τ : descentResidueLevel O.toLevelPlaces O.incl)
     submatrix_mul_of_mem_rangeParabolic _ (τ.prop (.inr i) trivial)
   have h_char : O.residueLevelChar τ = ∏ i : O.TwistIndex, (O.tamePart (O.placeAt (.inr i)))⁻¹
       ((τ.val (.inr i)).val.submatrix O.incl O.incl).det := rfl
-  simp only [residueBlockDatum, Rows.pointFormDatum, h_chosen, h_twist, h_char, star_prod,
-    MulChar.star_apply', inv_inv, det_mul, map_mul, prod_mul_distrib, mul_ite, mul_zero]
+  simp only [residueBlockDatum, h_chosen, h_twist, h_char, star_prod, MulChar.star_apply', inv_inv,
+    det_mul, map_mul, prod_mul_distrib, mul_ite, mul_zero]
 
 section
 
@@ -854,8 +854,8 @@ lemma exists_leftMul_eq_of_translatedBlockFn_ne_zero {A : Gf E r} {x : n × r �
       (∀ i : O.ChosenIndex, (u (.inl i)).map (residue _) = inclMatrix _ O.incl) ∧
       ∀ i ∈ (univ : Finset O.TwistIndex), O.tamePart (O.placeAt (.inr i))
         (((u (.inr i)).map (residue _)).submatrix O.incl id).det ≠ 0 := by
-    rwa [translatedBlockFn, residueDatum_of_eq_map _ u hu, residueBlockDatum, Rows.pointFormDatum,
-      ite_ne_right_iff, prod_ne_zero_iff] at hx
+    rwa [translatedBlockFn, residueDatum_of_eq_map _ u hu, residueBlockDatum, ite_ne_right_iff,
+      prod_ne_zero_iff] at hx
   have h_unit (j) : IsUnit (completeColumns O.incl (u j)).det := by
     rw [det_completeColumns, ← isUnit_map_iff (residue (LocInt _)), RingHom.map_det]
     change IsUnit (((u j).map (residue _)).submatrix O.incl id).det
@@ -990,8 +990,7 @@ lemma translatedBlockFn_eq_one_of_hasIntegralBlockRatio {A : Gf E r} {z : n × r
   have h_chosen (i) : (u (.inl i)).map (residue _) = inclMatrix (ResField _) O.incl := by
     rw [(eq_inclMatrix_mul_iff O.incl).2 (h_low i), h_res_top]
     exact Matrix.mul_one _
-  rw [translatedBlockFn, residueDatum_of_eq_map _ u hu, residueBlockDatum, Rows.pointFormDatum,
-    ite_eq_left h_chosen]
+  rw [translatedBlockFn, residueDatum_of_eq_map _ u hu, residueBlockDatum, ite_eq_left h_chosen]
   exact prod_eq_one fun i _ ↦ by rw [h_res_top, det_one, map_one]
 
 /-- Let `π` be a representation of `Gf E n`, the unitary group in `n` variables over the finite

@@ -656,9 +656,8 @@ theorem isTestForm_trivialLiftClassSum_pointForm {l : ℕ} [Fact l.Prime]
         mem_stabilizer_col_iff.1 ((mem_levelOf.1 hk).2 (.inl i) ⟨⟩)
       refine ⟨?_, by simpa using (map_block_eq_blockGL (reduceAt w) _ 1 k).1, fun i ↦ ?_⟩
       · classical
-        simp [X₁, DescentPair.residueBlockDatum, Rows.pointFormDatum, ↓Matrix.map_mul,
-          ↓reductionGL_map_modulusResidue, inv_mul_eq_iff_eq_mul_of_invertible, univ_eq_empty,
-          -Sum.elim_inl]
+        simp [X₁, DescentPair.residueBlockDatum, ↓Matrix.map_mul, ↓reductionGL_map_modulusResidue,
+          inv_mul_eq_iff_eq_mul_of_invertible, univ_eq_empty, -Sum.elim_inl]
         intro T
         congr! 3
         exact h_col _
