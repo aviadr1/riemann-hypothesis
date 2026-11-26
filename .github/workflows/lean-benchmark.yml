@@ -1,0 +1,186 @@
+name: Full cache staging with CI-esta
+on:
+  push:
+    branches: [codex/lean-staging-final]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: lake build
+    # Pull requests from forks run on the rh-pr-fork runners. (GitHub does not pass repository
+    # variables to pull requests from forks, so this cannot be a variable; replacing that
+    # fromJSON with '"ubuntu-latest"' sends them back to GitHub-hosted runners.) Other pull
+    # requests run on the rh-pr-trusted runners, except those whose head branch starts with
+    # batch/, which run on the rh-big runner with every other event.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      # Pull requests upload nothing, whichever runner they build on.
+      STAGE: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - name: Prepare benchmark volume
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          command -v mkfs.btrfs || (sudo apt-get update -qq && sudo apt-get install -y btrfs-progs)
+          df -h .
+          sudo mkdir -p /mnt/bench
+          sudo truncate -s 90G /mnt/lean-benchmark.img
+          sudo mkfs.btrfs -q /mnt/lean-benchmark.img
+          sudo mount -o loop,noatime /mnt/lean-benchmark.img /mnt/bench
+          sudo mkdir /mnt/bench/workspace
+          sudo mount --bind /mnt/bench/workspace "$GITHUB_WORKSPACE"
+          sudo chown "$USER" /mnt/bench "$GITHUB_WORKSPACE"
+      - name: Provision the runner's trusted dependency seed
+        env:
+          HOME: /mnt/bench/provision-home
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: |
+          mkdir -p "$HOME" /mnt/bench/seed
+          git -C /mnt/bench/seed init -q
+          git -C /mnt/bench/seed fetch -q --depth=1 https://github.com/leanprover-community/riemann-hypothesis c5451bd3ba92480e05c4218f5221bb2900c58706
+          git -C /mnt/bench/seed checkout -q --detach FETCH_HEAD
+          cd /mnt/bench/seed
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none --no-modify-path
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake exe mathlib/cache get
+          python3 scripts/tauceti-cache-get.py
+          cd /mnt/bench
+          mv /mnt/bench/provision-home/.elan /mnt/bench/seed/.elan
+          rm -rf /mnt/bench/provision-home
+          sudo mount --bind /mnt/bench/seed /mnt/bench/seed
+          sudo mount -o remount,bind,ro /mnt/bench/seed
+          df -h .
+      - name: Expose the read-only image at the production path
+        run: |
+          sudo mkdir -p /opt/rh-runner
+          sudo ln -s /mnt/bench/seed /opt/rh-runner/lean-seed
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check whether the merge queue has built this commit
+        # The merge queue moves main to the exact commit it built, and that build's artifact is
+        # what gets published, so the push build of that commit has nothing left to do.
+        id: queue
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I scripts/ci-github.py queue-tested --sha "$GITHUB_SHA"
+
+      - name: Fetch main's history for the cache baseline
+        if: steps.queue.outputs.tested != 'true'
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Restore prehydrated Lean dependencies
+        if: steps.queue.outputs.tested != 'true'
+        id: packages
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@ae26e5744dac2ad8bc4da2c9d621dcbe8f203c72
+        with:
+          seed-directory: /opt/rh-runner/lean-seed
+          link-elan-toolchains: 'true'
+
+      - name: Install elan and the toolchain in lean-toolchain
+        if: steps.queue.outputs.tested != 'true'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        if: steps.queue.outputs.tested != 'true'
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore Mathlib's cache
+        if: steps.queue.outputs.tested != 'true' && steps.packages.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        if: steps.queue.outputs.tested != 'true'
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        if: steps.queue.outputs.tested != 'true'
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        if: steps.queue.outputs.tested != 'true'
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        if: steps.queue.outputs.tested != 'true'
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Stage the new cache outputs
+        if: env.STAGE == 'true' && steps.queue.outputs.tested != 'true'
+        run: python3 -I scripts/ci-cache-stage.py "$RUNNER_TEMP/outputs.jsonl" "$RUNNER_TEMP/cache-stage"
+
+      - name: Upload the new cache outputs
+        if: env.STAGE == 'true' && steps.queue.outputs.tested != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-${{ github.sha }}
+          path: ${{ runner.temp }}/cache-stage
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: false
+      - name: Verify the seed, toolchain and staged proof outputs
+        env:
+          HIT: ${{ steps.packages.outputs.cache-hit }}
+        run: |
+          test "$HIT" = true
+          realpath "$(elan which lean)" | grep '^/mnt/bench/seed/.elan/toolchains/'
+          test -s "$RUNNER_TEMP/cache-stage/outputs.jsonl"
+          test -s "$RUNNER_TEMP/cache-stage/modules.jsonl.gz"
