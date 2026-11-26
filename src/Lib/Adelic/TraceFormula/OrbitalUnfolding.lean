@@ -84,14 +84,14 @@ theorem New.Space.exists_kernel_form {E n : Type} [Field E] [CMType E] [Fintype 
     rintro _ ⟨ν, rfl⟩ g
     exact V.partialKernel_ratEmbed_mul φ (fun _ ↦ .rfl) g x⁻¹
   have hF_level : HasLevel F K := V.hasLevel_partialKernel
-    (fun u hu y ↦ by simp [φ, TestFunction.indicator, Set.indicator,
+    (fun u hu y ↦ by simp [φ, Set.indicator,
       K.mul_mem_cancel_left (inv_mem hu)]) .univ x⁻¹
   obtain ⟨k, hk⟩ : ∃ k : levelSpace (V.formRep e) K, k.val.val = realConv e F :=
     exists_form_eq_realConv ⟨K, hK.isOpen⟩ hF_bdd hF_rat hF_level he.toIsIdempotentKernel
   refine ⟨k, fun g ↦ ?_⟩
   -- Conjugate term by term and replace `γ` by `γ⁻¹`, using `e y⁻¹ = conj (e y)`.
   have hφ_inv (y : Gf E n) : starRingEnd ℂ (φ.val y⁻¹) = Set.indicator K 1 y := by
-    simp [φ, TestFunction.indicator, Set.indicator]
+    simp [φ, Set.indicator]
   have h_term (γ : U V.J) :
       starRingEnd ℂ (V.kernelTerm e φ (Set.univ.indicator 1) g γ⁻¹ x⁻¹) =
         e (x * V.ratEmbed γ * g).1 * Set.indicator K 1 (x * V.ratEmbed γ * g).2 := by

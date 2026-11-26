@@ -74,6 +74,11 @@ noncomputable def TestFunction.indicator {K : Subgroup G} (hK_open : IsOpen (K :
     (hK_compact : IsCompact (K : Set G)) : TestFunction G :=
   TestFunction.clopenIndicator ⟨K.isClosed_of_isOpen hK_open, hK_open⟩ hK_compact
 
+omit [T2Space G] in
+@[simp] lemma TestFunction.indicator_apply_eq_indicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
+    (hK_compact : IsCompact (K : Set G)) (x : G) :
+    (indicator hK_open hK_compact : G → ℂ) x = Set.indicator K 1 x := rfl
+
 /-- The linear map `a ↦ a ⋆ 1_K` from the group algebra to the test functions, for a compact open
 subgroup `K`: the group element `b` goes to the characteristic function of the coset `b K`. -/
 noncomputable def convIndicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
@@ -88,7 +93,7 @@ lemma convIndicator_single {K : Subgroup G} (hK_open : IsOpen (K : Set G))
     (hK_compact : IsCompact (K : Set G)) (b : G) (c : ℂ) (x : G) :
     (convIndicator hK_open hK_compact (.single b c) : G → ℂ) x =
       if b⁻¹ * x ∈ K then c else 0 := by
-  simp [convIndicator, TestFunction.indicator, TestFunction.clopenIndicator, Set.indicator_apply]
+  simp [convIndicator, Set.indicator_apply]
 
 /-- For a compact open subgroup `K` and an element `a` of the group algebra, write `a ⋆ 1_K` for
 the test function given by `convIndicator`. Then `(c b * a) ⋆ 1_K` is `c` times the left translate
