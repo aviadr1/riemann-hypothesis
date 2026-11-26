@@ -57,6 +57,19 @@ This needs Python 3.11 or newer and curl 7.71 or newer. (No credentials are nece
 
 See [`CACHE.md`](CACHE.md) for details.
 
+## Finding duplicate proofs
+
+Contributors can use [dry-lint](https://github.com/gigaverse-app/dry-lint) to find similar declarations in
+different files under `src/`. From the repository root, run:
+
+```sh
+uvx --from 'dry-lint[lean]>=1,<2' dry-lint scan --limit 20
+```
+
+To review the declarations changed on a branch, replace `scan --limit 20` with `check --base origin/main`.
+The scan lists candidates for manual review. Check that the hypotheses and conclusions agree and that the
+existing declaration is available at the use site before sharing a proof.
+
 ## Layout
 
 *For now, this section is copied from https://github.com/lsernau/grh-lean. It may be out of date and is subject to change.*
