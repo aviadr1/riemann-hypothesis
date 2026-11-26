@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '040cb61c60a306e323bc38d82da0f20eed08875a' }}
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '38d0bdcd878fef5fabbfbf141de911995535258b' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -70,7 +70,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed1
         with:
           seed-directory: /mnt/bench/seed
@@ -161,7 +161,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'e26e2aafc927cd26486daef98ea9af523d0cf3ec' }}
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'c1b90802105e279550b1ec024f12af8197d958c9' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -169,7 +169,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed2
         with:
           seed-directory: /mnt/bench/seed
@@ -260,7 +260,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '040cb61c60a306e323bc38d82da0f20eed08875a' }}
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '38d0bdcd878fef5fabbfbf141de911995535258b' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -268,7 +268,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed3
         with:
           seed-directory: /mnt/bench/seed
@@ -359,7 +359,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'e26e2aafc927cd26486daef98ea9af523d0cf3ec' }}
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'c1b90802105e279550b1ec024f12af8197d958c9' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -367,7 +367,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed4
         with:
           seed-directory: /mnt/bench/seed
@@ -458,7 +458,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '040cb61c60a306e323bc38d82da0f20eed08875a' }}
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '38d0bdcd878fef5fabbfbf141de911995535258b' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -466,7 +466,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed5
         with:
           seed-directory: /mnt/bench/seed
@@ -557,7 +557,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'e26e2aafc927cd26486daef98ea9af523d0cf3ec' }}
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'c1b90802105e279550b1ec024f12af8197d958c9' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -565,7 +565,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed6
         with:
           seed-directory: /mnt/bench/seed
@@ -656,7 +656,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '040cb61c60a306e323bc38d82da0f20eed08875a' }}
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '38d0bdcd878fef5fabbfbf141de911995535258b' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -664,7 +664,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed7
         with:
           seed-directory: /mnt/bench/seed
@@ -755,7 +755,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'e26e2aafc927cd26486daef98ea9af523d0cf3ec' }}
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || 'c1b90802105e279550b1ec024f12af8197d958c9' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -763,7 +763,7 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a592753d0c26319eaf3ad199eaa06f6ff146ebc7
         id: seed8
         with:
           seed-directory: /mnt/bench/seed
