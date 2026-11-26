@@ -337,6 +337,9 @@ lemma cast_card_pos [NeZero N] : (0 : ℝ) < D.card :=
 
 @[simp] lemma swapVar_snd : (D.swapVar z).2 = z.2 := rfl
 
+@[simp] lemma swapVar_swapVar : D.swapVar (D.swapVar z) = z :=
+  Prod.ext (Equiv.swap_apply_self ..) rfl
+
 @[simp] lemma swapVar_varX : D.swapVar (D.varX s) = D.varY s := by
   simp only [swapVar, varX, varY, rootVar]
   split_ifs
@@ -344,10 +347,7 @@ lemma cast_card_pos [NeZero N] : (0 : ℝ) < D.card :=
   · exact Prod.ext (Equiv.swap_apply_right _ _) rfl
 
 @[simp] lemma swapVar_varY : D.swapVar (D.varY s) = D.varX s := by
-  simp only [swapVar, varX, varY, rootVar]
-  split_ifs
-  · exact Prod.ext (Equiv.swap_apply_right _ _) rfl
-  · exact Prod.ext (Equiv.swap_apply_left _ _) rfl
+  rw [← D.swapVar_varX (s := s), swapVar_swapVar]
 
 /-- Every variable is `Y_i`, `X_i`, some `Y_s` or `X_s` with `s ≠ i`, or lies off the root. -/
 lemma var_cases (z : Fin k × ZMod N) : z = D.varY D.letter ∨ z = D.varX D.letter ∨
@@ -415,16 +415,17 @@ namespace IsFixed
 
 variable {D}
 
-lemma ne_varX (hz : D.IsFixed z) (s : ZMod N) : z ≠ D.varX s := by
-  intro h; have h1 := congrArg Prod.fst h
-  simp only [varX, rootVar] at h1; split_ifs at h1; exact hz.1 h1; exact hz.2 h1
-
-lemma ne_varY (hz : D.IsFixed z) (s : ZMod N) : z ≠ D.varY s := by
-  intro h; have h1 := congrArg Prod.fst h
-  simp only [varY, rootVar] at h1; split_ifs at h1; exact hz.2 h1; exact hz.1 h1
-
 lemma swapVar_eq (hz : D.IsFixed z) : D.swapVar z = z := by
   rw [swapVar, Equiv.swap_apply_of_ne_of_ne hz.1 hz.2]
+
+lemma ne_varX (hz : D.IsFixed z) (s : ZMod N) : z ≠ D.varX s := by
+  rintro rfl
+  exact D.varY_ne_varX s s (D.swapVar_varX.symm.trans hz.swapVar_eq)
+
+lemma ne_varY (hz : D.IsFixed z) (s : ZMod N) : z ≠ D.varY s := by
+  intro h
+  apply hz.ne_varX s
+  simpa only [hz.swapVar_eq, swapVar_varY] using congrArg D.swapVar h
 
 lemma merge_eq (hz : D.IsFixed z) : D.merge z = z := ite_eq_right (hz.ne_varY D.letter)
 
