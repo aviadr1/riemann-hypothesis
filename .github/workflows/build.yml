@@ -102,7 +102,7 @@ jobs:
       - name: Restore prehydrated Lean dependencies
         if: steps.queue.outputs.tested != 'true'
         id: packages
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a1278dc2c71b7df5583a3d40ecbe9e0b1414f249
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@6e8941a010e17f621749391b57a35e8c5b3e4b45
         with:
           seed-directory: /opt/rh-runner/lean-seed
 
