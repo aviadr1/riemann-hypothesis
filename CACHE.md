@@ -38,7 +38,9 @@ finish the required `lake build` check on GitHub-hosted runners. Without that
 evidence it builds as usual. A proof, toolchain, cache or unfamiliar file change takes the
 normal build path. Merge groups still run the proof and axiom checks and produce cache artifacts.
 
-The same job runs affected Python tests for PR automation edits. The `.gv-dependencies.yaml`
+The same job runs affected Python tests for PR automation edits. Proof-only and documentation-only
+edits run the full Python suite with the standard library, which avoids selector setup and
+also covers tests that read a Lean or Markdown fixture. The `.gv-dependencies.yaml`
 files in `scripts/` and `scripts/tests/` describe the modules loaded by filename and the
 workflow YAML read by the label tests. A PR changing those declarations or their configuration
 runs all script tests and checks that the graph covers the tracked files the recorder observed.

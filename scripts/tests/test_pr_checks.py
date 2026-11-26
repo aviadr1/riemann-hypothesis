@@ -14,10 +14,10 @@ spec.loader.exec_module(ci)
 class PullRequestChecks(unittest.TestCase):
     def test_scope(self):
         for paths, expected in [
-            (["README.md"], (True, "none")),
+            (["README.md"], (True, "full")),
             (["scripts/inbox-sync.py", "scripts/tests/test_inbox_sync.py"], (True, "affected")),
             ([".github/workflows/inbox.yml"], (True, "affected")),
-            (["GUIDE.md", "src/New/Lemma.lean"], (False, "none")),
+            (["GUIDE.md", "src/New/Lemma.lean"], (False, "full")),
             (["src/Lib/A.lean", "scripts/batch-labels.py"], (False, "affected")),
             (["scripts/ci-cache-get.py"], (False, "affected")),
             (["scripts/tests/.gv-dependencies.yaml", "README.md"], (False, "policy")),
@@ -34,14 +34,14 @@ class PullRequestChecks(unittest.TestCase):
     def test_base_evidence(self):
         base = "1" * 40
         for parent, changed, runs, problem, expected in [
-            (base, b"README.md\0", [{"event": "merge_group"}], None, ("true", "none")),
+            (base, b"README.md\0", [{"event": "merge_group"}], None, ("true", "full")),
             (base, b"scripts/github-rest.py\0", [{"event": "merge_group"}], None, ("true", "affected")),
-            (base, b"README.md\0", [{"event": "merge_group"}], "wrong job", ("false", "none")),
-            (base, b"README.md\0", [{"event": "pull_request"}], None, ("false", "none")),
-            (base, b"README.md\0", [], None, ("false", "none")),
-            (base, b"README.md\0", OSError("offline"), None, ("false", "none")),
+            (base, b"README.md\0", [{"event": "merge_group"}], "wrong job", ("false", "full")),
+            (base, b"README.md\0", [{"event": "pull_request"}], None, ("false", "full")),
+            (base, b"README.md\0", [], None, ("false", "full")),
+            (base, b"README.md\0", OSError("offline"), None, ("false", "full")),
             ("2" * 40, b"README.md\0", [], None, ("false", "full")),
-            (base, b"src/A.lean\0README.md\0", [], None, ("false", "none")),
+            (base, b"src/A.lean\0README.md\0", [], None, ("false", "full")),
             (base, b"odd\nname\0README.md\0", [], None, ("false", "full")),
         ]:
             with (self.subTest(parent=parent, changed=changed, runs=runs, problem=problem),

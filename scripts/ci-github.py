@@ -146,7 +146,9 @@ def pr_scope(changed):
     tests = {p for p in changed if re.fullmatch(r"scripts/tests/test_\w+\.py", p)}
     reuse = changed <= DOCS | AUTOMATION | tests
     if changed <= DOCS | proof:
-        return reuse, "none"
+        # Even a Lean or Markdown file can be a script test fixture. The full
+        # standard-library suite is cheaper here than installing the selector.
+        return reuse, "full"
     if changed <= DOCS | proof | AUTOMATION | tests | {"scripts/ci-cache-get.py"}:
         return reuse, "affected"
     return False, "full"
