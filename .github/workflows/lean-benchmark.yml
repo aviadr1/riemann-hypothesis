@@ -1,7 +1,7 @@
 name: Lean dependency benchmark
 on:
   push:
-    branches: [codex/lean-seed-pair]
+    branches: [codex/lean-seed-series]
 permissions:
   contents: read
 jobs:
@@ -24,7 +24,7 @@ jobs:
           sudo mkdir -p /mnt/bench
           sudo truncate -s 90G /mnt/lean-benchmark.img
           sudo mkfs.btrfs -q /mnt/lean-benchmark.img
-          sudo mount -o loop,compress=zstd:1 /mnt/lean-benchmark.img /mnt/bench
+          sudo mount -o loop,noatime /mnt/lean-benchmark.img /mnt/bench
           sudo mkdir /mnt/bench/workspace
           sudo mount --bind /mnt/bench/workspace "$GITHUB_WORKSPACE"
           sudo chown "$USER" /mnt/bench "$GITHUB_WORKSPACE"
@@ -43,15 +43,25 @@ jobs:
           sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none --no-modify-path
           export PATH="$HOME/.elan/bin:$PATH"
           lake exe mathlib/cache get
+          python3 scripts/tauceti-cache-get.py
           cd /mnt/bench
           rm -rf /mnt/bench/provision-home
           sudo mount --bind /mnt/bench/seed /mnt/bench/seed
           sudo mount -o remount,bind,ro /mnt/bench/seed
           df -h .
-      - uses: actions/checkout@v4
+      - name: Isolate the benchmark homes
+        run: echo 'HOME=/mnt/bench/validation-home' >> "$GITHUB_ENV"
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout source PR 8607, sample 1
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: 00ad5769997d4ac20c063018f913038e18ca943d
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || 'e4329544a96f654e1cf1996a311b7a0584b9aa18' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -70,12 +80,12 @@ jobs:
 
       - name: Restore prehydrated Lean packages
         if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a1278dc2c71b7df5583a3d40ecbe9e0b1414f249
-        id: seed
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed1
         with:
           seed-directory: /mnt/bench/seed
       - name: Restore Mathlib's cache
-        if: steps.seed.outputs.cache-hit != 'true'
+        if: steps.seed1.outputs.cache-hit != 'true'
         # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
         env:
           MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
@@ -134,6 +144,686 @@ jobs:
       - name: Verify the benchmark exercised the requested cache path
         env:
           EXPECT: ${{ matrix.mode }}
-          HIT: ${{ steps.seed.outputs.cache-hit }}
+          HIT: ${{ steps.seed1.outputs.cache-hit }}
         run: |
+          test "$(git rev-parse HEAD:src)" = 353028242054cc524485e472782ff1b062ae82ec
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout batch PR 8177, sample 2
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || '306231dfd7b2ab8bc1b2cfc610815f26e9381bdb' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed2
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed2.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed2.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 3265ac211c7b5fdc14dbe590b6b676c22022824f
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout source PR 8607, sample 3
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || 'e4329544a96f654e1cf1996a311b7a0584b9aa18' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed3
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed3.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed3.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 353028242054cc524485e472782ff1b062ae82ec
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout batch PR 8177, sample 4
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || '306231dfd7b2ab8bc1b2cfc610815f26e9381bdb' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed4
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed4.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed4.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 3265ac211c7b5fdc14dbe590b6b676c22022824f
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout source PR 8607, sample 5
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || 'e4329544a96f654e1cf1996a311b7a0584b9aa18' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed5
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed5.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed5.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 353028242054cc524485e472782ff1b062ae82ec
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout batch PR 8177, sample 6
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || '306231dfd7b2ab8bc1b2cfc610815f26e9381bdb' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed6
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed6.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed6.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 3265ac211c7b5fdc14dbe590b6b676c22022824f
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout source PR 8607, sample 7
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || 'e4329544a96f654e1cf1996a311b7a0584b9aa18' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed7
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed7.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed7.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 353028242054cc524485e472782ff1b062ae82ec
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
+      - name: Start with a fresh home and checkout
+        run: |
+          test "$HOME" = /mnt/bench/validation-home
+          rm -rf -- /mnt/bench/validation-home
+          mkdir -p "$HOME"
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      - name: Checkout batch PR 8177, sample 8
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.mode == 'cold' && 'abc69d6a1b2099504b07e463653327fdfad97c97' || '306231dfd7b2ab8bc1b2cfc610815f26e9381bdb' }}
+      - name: Fetch main's history for the cache baseline
+        # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
+        # looked up along main's first-parent history (at most 200 commits).
+        run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Install elan and the toolchain in lean-toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          rm elan-init.sh
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Test the cache baseline selection
+        run: python3 -I scripts/tests/test_ci_cache_baseline.py
+
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
+        id: seed8
+        with:
+          seed-directory: /mnt/bench/seed
+      - name: Restore Mathlib's cache
+        if: steps.seed8.outputs.cache-hit != 'true'
+        # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
+        env:
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: lake exe mathlib/cache get
+
+      - name: Restore Tau Ceti's cache
+        # As in scripts/lake-cache-get.sh: checks the Mathlib pins agree and that the statements
+        # import no Tau Ceti module, then fetches the oleans of the imported Tau Ceti modules.
+        run: python3 scripts/tauceti-cache-get.py
+
+      - name: Restore this project's cache
+        # Exit 0: the exact build inputs were restored, and nothing should compile.
+        # Exit 4: a baseline was restored, and lake build compiles what changed since.
+        # Exit 3: no record at all, and lake build compiles everything.
+        run: |
+          ulimit -Sn "$(ulimit -Hn)"
+          status=0
+          python3 scripts/ci-cache-get.py --baseline origin/main || status=$?
+          case "$status" in
+            0) echo "::notice::Restored the cache for these exact build inputs." ;;
+            4) echo "::notice::Restored a baseline cache; lake build compiles the modules that changed since and the modules that import them." ;;
+            3) echo "::warning::No cache record matches these build inputs or any baseline; lake build compiles every module." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: lake build
+        run: |
+          set -o pipefail
+          if [[ "$STAGE" == true ]]; then
+            # As the hand publisher builds: -o writes Lake's map of every module's artifact, and
+            # packs each module's .ltar under .lake/build/ir.
+            export LAKE_CACHE_DIR="$PWD/.lake/cache" LAKE_RESTORE_ARTIFACTS=true
+            lake build -o "$RUNNER_TEMP/outputs.jsonl" 2>&1 | tee build.log
+          else
+            lake build 2>&1 | tee build.log
+          fi
+          # Lake replays the saved messages of the modules it did not compile, so this covers
+          # restored modules too.
+          if grep -n -e 'declaration uses `sorry`' -e "declaration uses 'sorry'" build.log; then
+            echo "::error::The build reports declarations that use sorry."
+            exit 1
+          fi
+
+      - name: Check the axioms of the five theorems
+        run: |
+          set -o pipefail
+          lake env lean scripts/PrintAxioms.lean 2>&1 | tee axioms.log
+          axioms='depends on axioms: [propext, Classical.choice, Quot.sound]'
+          printf "'%s' $axioms\n" riemannHypothesis riemannZeta_eq_zero_re LFunction_ne_zero_of_half_lt_re \
+            LFunction_eq_zero_re LFunction_eq_zero_re_of_isPrimitive > expected-axioms.log
+          if ! diff -u expected-axioms.log axioms.log; then
+            echo "::error::The five theorems must depend on exactly propext, Classical.choice and Quot.sound."
+            exit 1
+          fi
+
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed8.outputs.cache-hit }}
+        run: |
+          test "$(git rev-parse HEAD:src)" = 3265ac211c7b5fdc14dbe590b6b676c22022824f
           if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
