@@ -168,7 +168,8 @@ python3 scripts/tauceti-cache-get.py
 
 After both commands succeed, publish the checkout at that path (or switch a symlink to it
 atomically). The runner users need read access and must have no write access to the seed
-or its parents. Keep the previous target until jobs using it finish. Put the seed on the
+or its parents. Keep it outside home directories hidden by the job's systemd sandbox,
+and keep the previous target until jobs using it finish. Put the seed on the
 same reflink-capable filesystem as the runner homes for fast copy-on-write copies.
 
 CI-esta copies only `.lake/packages` into the fresh workspace when the toolchain, Lake
