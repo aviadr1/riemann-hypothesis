@@ -1,7 +1,7 @@
 name: Lean dependency benchmark
 on:
   push:
-    branches: [codex/lean-seed-ext4]
+    branches: [codex/lean-toolchain-ext4]
 permissions:
   contents: read
 jobs:
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [cold, seeded]
+        mode: [seeded]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -40,6 +40,7 @@ jobs:
           lake exe mathlib/cache get
           python3 scripts/tauceti-cache-get.py
           cd /mnt/bench
+          mv /mnt/bench/provision-home/.elan /mnt/bench/seed/.elan
           rm -rf /mnt/bench/provision-home
           sudo mount --bind /mnt/bench/seed /mnt/bench/seed
           sudo mount -o remount,bind,ro /mnt/bench/seed
@@ -56,12 +57,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || 'e4329544a96f654e1cf1996a311b7a0584b9aa18' }}
+          ref: ${{ matrix.mode == 'cold' && '00ad5769997d4ac20c063018f913038e18ca943d' || '040cb61c60a306e323bc38d82da0f20eed08875a' }}
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
         run: git fetch --no-tags --depth=200 origin +refs/heads/main:refs/remotes/origin/main
 
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@b5faf1e34e6182ba177aacdb52db121067ba4bf0
+        id: seed1
+        with:
+          seed-directory: /mnt/bench/seed
+          link-elan-toolchains: 'true'
       - name: Install elan and the toolchain in lean-toolchain
         run: |
           curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o elan-init.sh
@@ -69,16 +77,11 @@ jobs:
           rm elan-init.sh
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           "$HOME/.elan/bin/lake" --version
+          realpath "$("$HOME/.elan/bin/elan" which lean)" | grep '^/mnt/bench/seed/.elan/toolchains/'
 
       - name: Test the cache baseline selection
         run: python3 -I scripts/tests/test_ci_cache_baseline.py
 
-      - name: Restore prehydrated Lean packages
-        if: matrix.mode == 'seeded'
-        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@1d454d4fd4dc3fec5dede04db9309f6f25237ddb
-        id: seed1
-        with:
-          seed-directory: /mnt/bench/seed
       - name: Restore Mathlib's cache
         if: steps.seed1.outputs.cache-hit != 'true'
         # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
