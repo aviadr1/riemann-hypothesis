@@ -154,6 +154,29 @@ setup of all three is in `scripts/runner/`:
   for nothing else, so the hosts never hold a GitHub token. If the workstation stops, each runner
   runs the jobs its spool still allows (within 20 hours), then waits.
 
+### Prehydrating runner dependencies
+
+Each host can serve its ephemeral jobs a read-only Lean dependency seed at
+`/opt/rh-runner/lean-seed`. In a clean checkout of a **trusted main revision**, use the
+same Linux image and architecture as the runner and run the following as an unprivileged
+image-builder account, without Git credentials:
+
+```sh
+MATHLIB_CACHE_GET_URL=https://cache.mathlib.org/mathlib4 lake exe mathlib/cache get
+python3 scripts/tauceti-cache-get.py
+```
+
+After both commands succeed, publish the checkout at that path (or switch a symlink to it
+atomically). The runner users need read access and must have no write access to the seed
+or its parents. Keep the previous target until jobs using it finish. Put the seed on the
+same reflink-capable filesystem as the runner homes for fast copy-on-write copies.
+
+CI-esta copies only `.lake/packages` into the fresh workspace when the toolchain, Lake
+configuration and dependency manifest match. With a missing or mismatched seed the job
+fetches Mathlib as usual. Tau Ceti's pin and statement-import checks run on every build.
+Lake checks the current set of Tau Ceti imports and fetches any missing outputs. The
+project cache, proof build, sorry scan and five axiom checks follow as before.
+
 ## Tau Ceti
 
 The project depends on [Tau Ceti](https://github.com/TauCetiProject/TauCeti), pinned in `lakefile.toml`
@@ -167,7 +190,8 @@ cache:
   otherwise none of its cached oleans match;
 - stops if `src/Statements.lean`, `src/Main.lean` or `Challenge.lean` imports a Tau Ceti module,
   so that the five statements keep depending on Mathlib alone;
-- downloads Tau Ceti's mappings for the pinned revision (about 135 MB the first time);
+- checks whether the currently imported modules are up to date and, if needed, downloads
+  Tau Ceti's mappings for the pinned revision (about 135 MB the first time);
 - runs `lake build` on the Tau Ceti modules imported under `src`, which downloads exactly the
   oleans they need into `.lake/packages/TauCeti`.
 
