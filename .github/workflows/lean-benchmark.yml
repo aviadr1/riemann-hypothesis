@@ -1,11 +1,16 @@
 name: Lean dependency benchmark
 on:
   push:
-    branches: [codex/lean-seed-benchmark]
+    branches: [codex/lean-seed-pair]
 permissions:
   contents: read
 jobs:
-  baseline:
+  replay:
+    name: Rebuild the proof (${{ matrix.mode }})
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [cold, seeded]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -14,10 +19,39 @@ jobs:
       - name: Prepare benchmark volume
         run: |
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/.ghcup /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          command -v mkfs.btrfs || (sudo apt-get update -qq && sudo apt-get install -y btrfs-progs)
+          df -h .
+          sudo mkdir -p /mnt/bench
+          sudo truncate -s 90G /mnt/lean-benchmark.img
+          sudo mkfs.btrfs -q /mnt/lean-benchmark.img
+          sudo mount -o loop,compress=zstd:1 /mnt/lean-benchmark.img /mnt/bench
+          sudo mkdir /mnt/bench/workspace
+          sudo mount --bind /mnt/bench/workspace "$GITHUB_WORKSPACE"
+          sudo chown "$USER" /mnt/bench "$GITHUB_WORKSPACE"
+      - name: Provision the runner's trusted dependency seed
+        if: matrix.mode == 'seeded'
+        env:
+          HOME: /mnt/bench/provision-home
+          MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
+        run: |
+          mkdir -p "$HOME" /mnt/bench/seed
+          git -C /mnt/bench/seed init -q
+          git -C /mnt/bench/seed fetch -q --depth=1 https://github.com/leanprover-community/riemann-hypothesis c5451bd3ba92480e05c4218f5221bb2900c58706
+          git -C /mnt/bench/seed checkout -q --detach FETCH_HEAD
+          cd /mnt/bench/seed
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none --no-modify-path
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake exe mathlib/cache get
+          cd /mnt/bench
+          rm -rf /mnt/bench/provision-home
+          sudo mount --bind /mnt/bench/seed /mnt/bench/seed
+          sudo mount -o remount,bind,ro /mnt/bench/seed
           df -h .
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: 00ad5769997d4ac20c063018f913038e18ca943d
       - name: Fetch main's history for the cache baseline
         # On a pull request the checkout is GitHub's merge of the head into main. The baseline is
         # looked up along main's first-parent history (at most 200 commits).
@@ -34,7 +68,14 @@ jobs:
       - name: Test the cache baseline selection
         run: python3 -I scripts/tests/test_ci_cache_baseline.py
 
+      - name: Restore prehydrated Lean packages
+        if: matrix.mode == 'seeded'
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a1278dc2c71b7df5583a3d40ecbe9e0b1414f249
+        id: seed
+        with:
+          seed-directory: /mnt/bench/seed
       - name: Restore Mathlib's cache
+        if: steps.seed.outputs.cache-hit != 'true'
         # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
         env:
           MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
@@ -90,3 +131,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify the benchmark exercised the requested cache path
+        env:
+          EXPECT: ${{ matrix.mode }}
+          HIT: ${{ steps.seed.outputs.cache-hit }}
+        run: |
+          if [[ "$EXPECT" == seeded ]]; then test "$HIT" = true; fi
