@@ -1,0 +1,71 @@
+name: Lake tooling probe
+on:
+  push:
+    branches: [codex/lake-tooling-probe]
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    name: Measure Lake setup and incremental builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: leanprover/lean4
+          ref: v4.37.0-rc1
+          persist-credentials: false
+          sparse-checkout: tests/lake_bench/inundation
+      - name: Install the benchmark toolchain
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --no-modify-path --default-toolchain leanprover/lean4:v4.37.0-rc1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lake" --version
+      - name: Generate the upstream benchmark project
+        working-directory: tests/lake_bench/inundation
+        run: lake -R -Klayers=24 -Kwidth=44 run mkBuild
+      - name: Measure clean build
+        working-directory: tests/lake_bench/inundation
+        run: /usr/bin/time -f 'clean\t%e\t%U\t%S\t%M' lake -Klayers=24 -Kwidth=44 build
+      - name: Measure warm startup, no-op build and module setups
+        working-directory: tests/lake_bench/inundation
+        run: |
+          date -u
+          nproc
+          cat /proc/cpuinfo | sed -n 's/^model name[[:space:]]*: //p' | sort -u
+          lake --version
+          metrics="$RUNNER_TEMP/lake-timings.tsv"
+          printf 'workload\twall_seconds\tuser_seconds\tsystem_seconds\tmax_rss_kib\n' > "$metrics"
+          for sample in {1..5}; do
+            /usr/bin/time -f 'startup\t%e\t%U\t%S\t%M' -a -o "$metrics" lake self-check
+            /usr/bin/time -f 'no-op\t%e\t%U\t%S\t%M' -a -o "$metrics" lake -Klayers=24 -Kwidth=44 build
+            /usr/bin/time -f 'setups\t%e\t%U\t%S\t%M' -a -o "$metrics" lake -Klayers=24 -Kwidth=44 build setups
+          done
+          cat "$metrics"
+          { echo '```'; cat "$metrics"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+  declarations:
+    name: Scan Lake declarations with dry-lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: leanprover/lean4
+          ref: 28858e4e004b58c6b6858cd82861345d1f302af0
+          persist-credentials: false
+          sparse-checkout: src/lake
+      - name: Rank similar Lean declarations
+        run: |
+          set -o pipefail
+          mkdir -p .dry-lint
+          cat > .dry-lint/config.toml <<'CONFIG'
+          include = ["src/lake/*.lean"]
+          extractors = [{ use = "lean", min_lines = 5 }]
+          judge = "none"
+
+          [models]
+          enabled = false
+          CONFIG
+          pipx run --spec 'dry-lint[lean]==1.13.0' dry-lint scan --limit 20 | tee "$RUNNER_TEMP/lake-dry-lint.txt"
+          { echo '```'; cat "$RUNNER_TEMP/lake-dry-lint.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
