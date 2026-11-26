@@ -161,6 +161,20 @@ lemma allBijective_iff_forall_bijectiveUpTo : AllBijective f ↔ ∀ r : ℕ, Bi
   ⟨fun h r n ↦ ⟨fun _ ↦ (h n).injective, fun _ ↦ (h n).surjective⟩,
     fun h n ↦ ⟨(h (2 * n + 2)).injective (by lia), (h (2 * n + 2)).surjective (by lia)⟩⟩
 
+/-- To prove bijectivity in every degree for a family of comparisons, it suffices to
+advance one injectivity or surjectivity condition for every comparison, using the preceding
+conditions for the whole family. -/
+lemma allBijective_of_bijectiveUpTo_succ {ι : Sort*} {M N : ι → ℕ → Type*}
+    {g : ∀ i n, M i n → N i n} {P : ι → Prop}
+    (step : ∀ r, (∀ i, P i → BijectiveUpTo (g i) r) →
+      ∀ i, P i → BijectiveUpTo (g i) (r + 1))
+    (i : ι) (hi : P i) : AllBijective (g i) := by
+  have h (r : ℕ) : ∀ j, P j → BijectiveUpTo (g j) r := by
+    induction r with
+    | zero => simp [BijectiveUpTo]
+    | succ r ih => exact step r ih
+  exact allBijective_iff_forall_bijectiveUpTo.mpr fun r ↦ h r i hi
+
 /-- If bijections a_n: A_n → A'_n and b_n: B_n → B'_n carry the maps f_n to the maps g_n, then f
 satisfies the first r conditions of `BijectiveUpTo` (f₀ injective, f₀ surjective, f₁ injective, …)
 exactly when g does. -/

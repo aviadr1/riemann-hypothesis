@@ -932,21 +932,19 @@ perfect over O^♭, S ↦ Hom(b, S^♭) on p-adic tests with coefficients S^♭ 
 b ⊗ N ⊗ 𝔪, in degree 0. -/
 lemma isAcyclicAt_perfectTilt (hN : ∀ x : N, pFlat • x = 0) (b : PerfectAlg p OFlat) :
     IsAcyclicAt perfectTilt (ObjectProperty.ι _ ⋙ moduleCoeff (almostCoeff N)) b := by
-  -- Every b has a cover b → b' (onto on points in tests) with the claim known for b'
-  -- (`exists_isPointwiseSurjective_and_isAcyclicAt`). Čech descent (`bijectiveUpTo_of_cech_pred`)
-  -- then gives one more step of `BijectiveUpTo` for b from the fibre powers of b'.
-  refine allBijective_iff_forall_bijectiveUpTo.mpr fun r ↦ ?_
-  induction r generalizing b with
-  | zero => tauto
-  | succ r ih =>
-    obtain ⟨b', y, hy, hb'⟩ := exists_isPointwiseSurjective_and_isAcyclicAt (N := N) b
-    -- v-descent (`isCover_of_points`): a map that is onto on points in tests is a cover for these
-    -- coefficients; this is where `hN` is used
-    refine bijectiveUpTo_of_cech_pred rfl (isCover_of_points hN y hy) hy.isCover hb' fun m ↦ ?_
-    -- the fibre powers are represented by perfect algebras D, to which induction applies
-    obtain ⟨D, z, hz⟩ := exists_repr_cech y m
-    exact (bijectiveUpTo_congr (comp_id _) (of_bijective hz)
-      (of_bijective fun c ↦ hz (perfectTilt.obj c))).mpr (ih D)
+  let c := Comparison.restrict perfectTilt (ObjectProperty.ι _ ⋙ moduleCoeff (almostCoeff N))
+  refine allBijective_of_bijectiveUpTo_succ
+    (g := fun b n ↦ c.pull (freeAbMap (𝟙 (perfectTilt ⋙ reprBy b))) n)
+    (P := fun _ ↦ True) ?_ b trivial
+  intro r ih b _
+  obtain ⟨b', y, hy, hb'⟩ := exists_isPointwiseSurjective_and_isAcyclicAt (N := N) b
+  -- v-descent (`isCover_of_points`): a map that is onto on points in tests is a cover for these
+  -- coefficients; this is where `hN` is used
+  refine bijectiveUpTo_of_cech_pred rfl (isCover_of_points hN y hy) hy.isCover hb' fun m ↦ ?_
+  -- the fibre powers are represented by perfect algebras D, to which induction applies
+  obtain ⟨D, z, hz⟩ := exists_repr_cech y m
+  exact (bijectiveUpTo_congr (comp_id _) (of_bijective hz)
+    (of_bijective fun c ↦ hz (perfectTilt.obj c))).mpr (ih D trivial)
 
 /-- Let `N` be an `OFlat`-module killed by `pFlat`. For every perfect `OFlat`-algebra `b`, the
 cohomology of the points of `b` in the tilts of tests, with coefficients `almostCoeff N`, is the

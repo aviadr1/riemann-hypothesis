@@ -579,39 +579,37 @@ lemma IsAffinelyCovered.devissage_bijective {M N : C ⥤ Ab → ℕ → Type _}
     {f : (N' : C ⥤ Ab) → (n : ℕ) → M N' n → N N' n} (h : Devissage (D := C) (A := M) (B := N) f)
     (h_rep : ∀ c : C, AllBijective (f (freeAb.obj (reprBy c)))) (hY : IsAffinelyCovered ι Y) :
     AllBijective (f (freeAb.obj (ι ⋙ Y))) := by
-  -- Induction on the number `r` of conditions in `BijectiveUpTo`, for all affinely covered `Y`.
-  refine allBijective_iff_forall_bijectiveUpTo.mpr fun r ↦ ?_
-  induction r generalizing Y with
-  | zero => simp [BijectiveUpTo]
-  | succ r ih =>
-    obtain ⟨d, ⟨w⟩⟩ | h_empty := em (∃ d, Nonempty ((ι ⋙ Y).obj d))
-    swap
-    · -- without points, `freeAb.obj (ι ⋙ Y)` is zero
-      have h_id_zero : 𝟙 (freeAb.obj (ι ⋙ Y)) = 0 :=
-        freeAb.hom_ext fun d w ↦ (h_empty ⟨d, ⟨w⟩⟩).elim
-      exact allBijective_iff_forall_bijectiveUpTo.mp (h.isClosedClass.1 _ h_id_zero) _
-    -- cover `ι ⋙ Y` by a representable functor
-    obtain ⟨hY_sep, B, y, hy⟩ := hY
-    obtain ⟨c, ⟨η⟩, hη⟩ := HasCoveringPoints.exists_surjective_point B (hy d w).choose
-    let q := reprMap η ≫ pointMap y
-    let Q : Subfunctor (ι ⋙ Y) := range (ι.whiskerLeft q)
-    -- the image `Q` is all of `ι ⋙ Y`, as every point of `Y` comes from `y` and `η`
-    have h_iso : IsIso Q.ι := by
-      refine Q.eq_top_iff_isIso.mp (top_unique fun d x _ ↦ ?_)
-      obtain ⟨a, ha⟩ := (hy d).comp (hη d) x
-      exact ⟨⟨ι.map a.down⟩, ha⟩
-    -- Čech descent: `r + 1` conditions on the cover and `r` on its fibre powers give `r + 1` on the
-    -- image, which is all of `ι ⋙ Y`
-    have h_cover : AllBijective (f (freeAb.obj (ι ⋙ reprBy (ι.obj c)))) :=
-      h.isClosedClass.freeAb_of_bijective _ (pointMap_id_bijective_of_fullyFaithful ι c) (h_rep c)
-    have h_range : BijectiveUpTo (f (freeAb.obj Q.toFunctor)) (r + 1) :=
-      cech_descent_step _ h.toStepwiseFourLemma (allBijective_iff_forall_bijectiveUpTo.mp h_cover _)
-        fun m ↦ ih (isAffinelyCovered_cech hY_sep η y m)
-    -- pass along the isomorphism from the image, whose kernel is zero
-    have h_ker : AllBijective (f (kernel (freeAb.map Q.ι))) :=
-      h.isClosedClass.1 _ ((isZero_kernel_of_mono _).eq_of_src _ _)
-    exact h.bijectiveUpTo_quotient ⟨exact_kernel (freeAb.map Q.ι)⟩ h_range
-      (allBijective_iff_forall_bijectiveUpTo.mp h_ker _)
+  refine allBijective_of_bijectiveUpTo_succ (g := fun X ↦ f (freeAb.obj (ι ⋙ X)))
+    (P := IsAffinelyCovered ι) ?_ Y hY
+  intro r ih Y hY
+  obtain ⟨d, ⟨w⟩⟩ | h_empty := em (∃ d, Nonempty ((ι ⋙ Y).obj d))
+  swap
+  · -- without points, `freeAb.obj (ι ⋙ Y)` is zero
+    have h_id_zero : 𝟙 (freeAb.obj (ι ⋙ Y)) = 0 :=
+      freeAb.hom_ext fun d w ↦ (h_empty ⟨d, ⟨w⟩⟩).elim
+    exact allBijective_iff_forall_bijectiveUpTo.mp (h.isClosedClass.1 _ h_id_zero) _
+  -- cover `ι ⋙ Y` by a representable functor
+  obtain ⟨hY_sep, B, y, hy⟩ := hY
+  obtain ⟨c, ⟨η⟩, hη⟩ := HasCoveringPoints.exists_surjective_point B (hy d w).choose
+  let q := reprMap η ≫ pointMap y
+  let Q : Subfunctor (ι ⋙ Y) := range (ι.whiskerLeft q)
+  -- the image `Q` is all of `ι ⋙ Y`, as every point of `Y` comes from `y` and `η`
+  have h_iso : IsIso Q.ι := by
+    refine Q.eq_top_iff_isIso.mp (top_unique fun d x _ ↦ ?_)
+    obtain ⟨a, ha⟩ := (hy d).comp (hη d) x
+    exact ⟨⟨ι.map a.down⟩, ha⟩
+  -- Čech descent: `r + 1` conditions on the cover and `r` on its fibre powers give `r + 1` on the
+  -- image, which is all of `ι ⋙ Y`
+  have h_cover : AllBijective (f (freeAb.obj (ι ⋙ reprBy (ι.obj c)))) :=
+    h.isClosedClass.freeAb_of_bijective _ (pointMap_id_bijective_of_fullyFaithful ι c) (h_rep c)
+  have h_range : BijectiveUpTo (f (freeAb.obj Q.toFunctor)) (r + 1) :=
+    cech_descent_step _ h.toStepwiseFourLemma (allBijective_iff_forall_bijectiveUpTo.mp h_cover _)
+      fun m ↦ ih _ (isAffinelyCovered_cech hY_sep η y m)
+  -- pass along the isomorphism from the image, whose kernel is zero
+  have h_ker : AllBijective (f (kernel (freeAb.map Q.ι))) :=
+    h.isClosedClass.1 _ ((isZero_kernel_of_mono _).eq_of_src _ _)
+  exact h.bijectiveUpTo_quotient ⟨exact_kernel (freeAb.map Q.ι)⟩ h_range
+    (allBijective_iff_forall_bijectiveUpTo.mp h_ker _)
 
 /-- Let ι from C to A-algebras be fully faithful, and suppose each A-algebra B with a point in some
 ι(c) has one point through which all its points factor (`New.Variety.HasCoveringPoints`). If Y is

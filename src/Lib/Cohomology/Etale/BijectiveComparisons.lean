@@ -834,6 +834,77 @@ lemma bijectiveUpTo_of_cech_pred (w : p' ≫ u = v ≫ c.functor.whiskerLeft p) 
     freeAb.hom_ext fun _ _ ↦ rfl
   exact (BijectiveUpTo.congr hp hp' (map_pull_eq_pull_map h_comm)).mpr h_range
 
+-- Pasting the pullbacks identifies the fibre over `x` with the fibre over `t x`.
+private lemma isBijective_fibers_of_isPullback (t : E ⟶ Y)
+    (h_pb : IsPullback v p' (c.functor.whiskerLeft t) u)
+    (h_fibre : ∀ (A : C) (x : E.obj A),
+      c.IsBijective (freeAbMap (snd u (whiskerLeft c.functor (pointMap (t A x)))))) :
+    ∀ (A : C) (x : E.obj A), c.IsBijective (freeAbMap (snd v (whiskerLeft c.functor (pointMap x)))) := by
+  intro A x
+  have h_fibre_tx : c.IsBijective (freeAbMap (snd u (whiskerLeft _ (pointMap x ≫ t)))) := by
+    rw [pointMap_comp x t]
+    exact h_fibre A x
+  let i : c.functor ⋙ reprBy A ⟶ c.functor ⋙ E := whiskerLeft c.functor (pointMap x)
+  have h_pasted : IsPullback (snd v i) (fst v i ≫ p') (i ≫ whiskerLeft c.functor t) u :=
+    isPullback_fiberProd.paste_vert h_pb
+  exact h_fibre_tx.precomp_of_bijective _
+    (h_pasted.isoIsPullback_hom_fst _ _ isPullback_fiberProd)
+    fun B ↦ (Iso.app _ B).toEquiv.bijective
+
+-- The simultaneous induction ranges over comparisons whose point fibres are already bijective.
+private lemma isBijective_of_pointFibers
+    (h_fib : ∀ (A : C) (x : E.obj A),
+      c.IsBijective (freeAbMap (snd v (whiskerLeft c.functor (pointMap x))))) :
+    c.IsBijective (freeAbMap v) := by
+  let I := Σ (T : C ⥤ Type 1) (T' : C' ⥤ Type 1), T' ⟶ c.functor ⋙ T
+  let good (i : I) := ∀ (A : C) (x : i.1.obj A),
+    c.IsBijective (freeAbMap (snd i.2.2 (whiskerLeft c.functor (pointMap x))))
+  refine allBijective_of_bijectiveUpTo_succ (g := fun (i : I) n ↦ c.pull (freeAbMap i.2.2) n)
+    (P := good) ?_ ⟨E, E', v⟩ h_fib
+  intro r ih ⟨E, E', v⟩ h_fib
+  -- Cover `E` by the representable functors of its points and `E'` by the fibres over them.
+  let repr (x : E.Elements) : C ⥤ Type 1 := reprBy x.obj
+  let fib (x : E.Elements) : C' ⥤ Type 1 := fiberProd v (whiskerLeft _ (pointMap x.val))
+  let q : sigma repr ⟶ E := desc fun x ↦ pointMap x.val
+  let q' : sigma fib ⟶ E' := desc fun x ↦ fst v (whiskerLeft _ (pointMap x.val))
+  have hq : IsPointwiseSurjective q := fun A y ↦ ⟨⟨⟨y⟩, ⟨𝟙 A⟩⟩, E.map_id_apply A y⟩
+  -- a point `y` of `E'` is hit by the point `(y, 𝟙)` of the fibre of `v` over `v y`
+  have hq' : IsPointwiseSurjective q' := fun B y ↦
+    ⟨⟨⟨v B y⟩, (y, ⟨𝟙 _⟩), (E.map_id_apply ..).symm⟩, rfl⟩
+  -- On the disjoint unions the comparison is the product of the bijections `h_fib`
+  -- (`sigma_bijective`: cohomology turns disjoint unions into products).
+  let v₁ : sigma fib ⟶ c.functor ⋙ sigma repr :=
+    desc fun x ↦ snd v (whiskerLeft _ (pointMap x.val)) ≫ whiskerLeft _ (ι repr x)
+  have hv₁ : c.IsBijective (freeAbMap v₁) := by
+    intro n
+    refine (bijective_iff_of_comm_sq (fun z ↦ funext fun x ↦ (map_pull_eq_pull_map ?_ n z).symm)
+      (sigma_bijective ..) (sigma_bijective ..)).mpr (.piMap fun x ↦ h_fib x.obj x.val n)
+    -- on the summand `x`, the map `v₁` is the second projection of the fibre over `x`
+    exact freeAb.hom_ext fun _ _ ↦ rfl
+  have h_sq : q' ≫ v = v₁ ≫ whiskerLeft _ q := by
+    -- a point of a fibre product has the same image under both of its projections
+    ext B ⟨x, ⟨_, h_lies⟩⟩
+    exact h_lies
+  -- The map of the fibre powers is a base change of `v`, so `ih` applies to it.
+  have h_cech_pullback (m : ℕ) :
+      IsPullback ((cechFunctor m).map (homMk' v₁ v h_sq.symm)) (proj q' m 0 ≫ q')
+        (c.functor.whiskerLeft (proj q m 0 ≫ q)) v := by
+    refine isPullback_iff.mpr
+      ⟨fun B z ↦ (z.val 0).snd.property.symm, fun B y g hg ↦ ⟨?_, ?_, ?_⟩⟩
+    · -- over a point `y` of `E'` and a tuple `g` lies the tuple that puts `y` beside each
+      -- `g i`: each `g i` has the image of `g 0` in `E`, which is `v y`
+      exact ⟨fun i ↦ ⟨(g.val i).fst, (y, (g.val i).snd), hg.symm.trans (g.property 0 i)⟩,
+        fun _ _ ↦ rfl⟩
+    · -- this tuple lies over `y` and over `g`
+      exact ⟨rfl, rfl⟩
+    · -- it is the only one: the points of `E'` in a tuple of the fibre power are all equal
+      rintro z ⟨⟨⟩, ⟨⟩⟩
+      refine Subtype.ext (funext fun i ↦ ?_)
+      exact Sigma.ext rfl (heq_of_eq (Subtype.ext (Prod.ext (z.property i 0) rfl)))
+  exact bijectiveUpTo_of_cech_pred h_sq hq.isCover hq'.isCover hv₁ fun m ↦
+    ih ⟨cech q m, cech q' m, _⟩
+      (isBijective_fibers_of_isPullback (proj q m 0 ≫ q) (h_cech_pullback m) fun A z ↦ h_fib A _)
+
 /-- Let `u : Y' ⟶ c.functor ⋙ Y` and `t : E ⟶ Y`, and let `v : E' ⟶ c.functor ⋙ E`, with
 `p' : E' ⟶ Y'`, be the pull-back of `u` along `t`. Suppose that for every point `x` of `E A` the
 comparison is bijective in all degrees along the projection to `c.functor ⋙ reprBy A` of the fibre
@@ -842,65 +913,7 @@ lemma isBijective_of_fibers (t : E ⟶ Y) (h_pb : IsPullback v p' (c.functor.whi
     (h_fibre : ∀ (A : C) (x : E.obj A),
       c.IsBijective (freeAbMap (snd u (whiskerLeft c.functor (pointMap (t A x)))))) :
     c.IsBijective (freeAbMap v) := by
-  -- Induction on the number `r` of conditions, for all base changes at once, by Čech descent
-  -- along the cover `q` of `E` by the representable functors of all its points and the cover `q'`
-  -- of `E'` by the fibres of `v` over these points.
-  refine allBijective_iff_forall_bijectiveUpTo.mpr fun r ↦ ?_
-  induction r generalizing Y Y' E E' with
-  | zero => simp [BijectiveUpTo]
-  | succ r ih =>
-    -- The fibre of `v` over `x` is the fibre of `u` over `t x`, by pasting of pull-backs.
-    have h_fib (A : C) (x : E A) :
-        c.IsBijective (freeAbMap (snd v (whiskerLeft _ (pointMap x)))) := by
-      have h_fibre_tx : c.IsBijective (freeAbMap (snd u (whiskerLeft _ (pointMap x ≫ t)))) := by
-        rw [pointMap_comp x t]
-        exact h_fibre A x
-      let i : c.functor ⋙ reprBy A ⟶ c.functor ⋙ E := whiskerLeft c.functor (pointMap x)
-      have h_pasted : IsPullback (snd v i) (fst v i ≫ p') (i ≫ whiskerLeft c.functor t) u :=
-        isPullback_fiberProd.paste_vert h_pb
-      exact h_fibre_tx.precomp_of_bijective _
-        (h_pasted.isoIsPullback_hom_fst _ _ isPullback_fiberProd)
-        fun B ↦ (Iso.app _ B).toEquiv.bijective
-    let repr (x : E.Elements) : C ⥤ Type 1 := reprBy x.obj
-    let fib (x : E.Elements) : C' ⥤ Type 1 := fiberProd v (whiskerLeft _ (pointMap x.val))
-    let q : sigma repr ⟶ E := desc fun x ↦ pointMap x.val
-    let q' : sigma fib ⟶ E' := desc fun x ↦ fst v (whiskerLeft _ (pointMap x.val))
-    have hq : IsPointwiseSurjective q := fun A y ↦ ⟨⟨⟨y⟩, ⟨𝟙 A⟩⟩, E.map_id_apply A y⟩
-    -- a point `y` of `E'` is hit by the point `(y, 𝟙)` of the fibre of `v` over `v y`
-    have hq' : IsPointwiseSurjective q' := fun B y ↦
-      ⟨⟨⟨v B y⟩, (y, ⟨𝟙 _⟩), (E.map_id_apply ..).symm⟩, rfl⟩
-    -- On the disjoint unions the comparison is the product of the bijections `h_fib`
-    -- (`sigma_bijective`: cohomology turns disjoint unions into products).
-    let v₁ : sigma fib ⟶ c.functor ⋙ sigma repr :=
-      desc fun x ↦ snd v (whiskerLeft _ (pointMap x.val)) ≫ whiskerLeft _ (ι repr x)
-    have hv₁ : c.IsBijective (freeAbMap v₁) := by
-      intro n
-      refine (bijective_iff_of_comm_sq (fun z ↦ funext fun x ↦ (map_pull_eq_pull_map ?_ n z).symm)
-        (sigma_bijective ..) (sigma_bijective ..)).mpr (.piMap fun x ↦ h_fib x.obj x.val n)
-      -- on the summand `x`, the map `v₁` is the second projection of the fibre over `x`
-      exact freeAb.hom_ext fun _ _ ↦ rfl
-    have h_sq : q' ≫ v = v₁ ≫ whiskerLeft _ q := by
-      -- a point of a fibre product has the same image under both of its projections
-      ext B ⟨x, ⟨_, h_lies⟩⟩
-      exact h_lies
-    -- The map of the fibre powers is a base change of `v`, so `ih` applies to it.
-    have h_cech_pullback (m : ℕ) :
-        IsPullback ((cechFunctor m).map (homMk' v₁ v h_sq.symm)) (proj q' m 0 ≫ q')
-          (c.functor.whiskerLeft (proj q m 0 ≫ q)) v := by
-      refine isPullback_iff.mpr
-        ⟨fun B z ↦ (z.val 0).snd.property.symm, fun B y g hg ↦ ⟨?_, ?_, ?_⟩⟩
-      · -- over a point `y` of `E'` and a tuple `g` lies the tuple that puts `y` beside each
-        -- `g i`: each `g i` has the image of `g 0` in `E`, which is `v y`
-        exact ⟨fun i ↦ ⟨(g.val i).fst, (y, (g.val i).snd), hg.symm.trans (g.property 0 i)⟩,
-          fun _ _ ↦ rfl⟩
-      · -- this tuple lies over `y` and over `g`
-        exact ⟨rfl, rfl⟩
-      · -- it is the only one: the points of `E'` in a tuple of the fibre power are all equal
-        rintro z ⟨⟨⟩, ⟨⟩⟩
-        refine Subtype.ext (funext fun i ↦ ?_)
-        exact Sigma.ext rfl (heq_of_eq (Subtype.ext (Prod.ext (z.property i 0) rfl)))
-    exact bijectiveUpTo_of_cech_pred h_sq hq.isCover hq'.isCover hv₁ fun m ↦
-      ih (proj q m 0 ≫ q) (h_cech_pullback m) fun A z ↦ h_fib A _
+  exact isBijective_of_pointFibers (isBijective_fibers_of_isPullback t h_pb h_fibre)
 
 /-! ### Universal points -/
 

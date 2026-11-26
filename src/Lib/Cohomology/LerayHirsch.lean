@@ -275,16 +275,12 @@ lemma Devissage.allBijective_of_allBijective_sigma_reprBy {A B : C ⥤ Ab → �
     (h_sum : ∀ (ι : Type 1) (c : ι → C),
       AllBijective (f (freeAb.obj (sigma fun i : ι ↦ reprBy (c i))))) (S : C ⥤ Ab) :
     AllBijective (f S) := by
-  -- Induction on the number `r` of conditions in `BijectiveUpTo`, for all functors at once.
-  refine allBijective_iff_forall_bijectiveUpTo.mpr fun r ↦ ?_
-  induction r generalizing S with
-  | zero => tauto
-  | succ r ih =>
-    -- cover `S` by a sum of representables: the cover satisfies every condition, the kernel
-    -- the first `r`, so `S` satisfies the first `r + 1`
-    obtain ⟨ι, c, g, h_exact, -⟩ := exists_acyclic_cover S
-    exact hf.bijectiveUpTo_quotient h_exact
-      (allBijective_iff_forall_bijectiveUpTo.mp (h_sum ι c) (r + 1)) (ih _)
+  refine allBijective_of_bijectiveUpTo_succ (g := f) (P := fun _ ↦ True) ?_ S trivial
+  intro r ih S _
+  -- The cover satisfies every condition and the kernel satisfies the first `r`.
+  obtain ⟨ι, c, g, h_exact, -⟩ := exists_acyclic_cover S
+  exact hf.bijectiveUpTo_quotient h_exact
+    (allBijective_iff_forall_bijectiveUpTo.mp (h_sum ι c) (r + 1)) (ih _ trivial)
 
 omit [DecidableEq I] in
 /-- Let θ be a finite family of classes in Ext(G∘φ, F), for a functor φ. If the Leray–Hirsch map
