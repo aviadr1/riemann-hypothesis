@@ -29,6 +29,21 @@ that nothing needs compiling. `lake exe mathlib/cache get` fetches Mathlib alone
 A change to the sources, `lakefile.toml`, `lake-manifest.json` or `lean-toolchain` gives different
 build inputs; `lake exe cache get` then says that no cache matches.
 
+## Pull request checks
+
+On a pull request, the required `lake build` job compares the tested merge checkout to its
+exact base. For changes confined to the listed documentation, PR automation or script tests,
+it can reuse the successful merge-queue proof check for that base on `rh-big`. Without that
+evidence it builds as usual. A proof, toolchain, cache or unfamiliar file change takes the
+normal build path. Merge groups still run the proof and axiom checks and produce cache artifacts.
+
+The same job runs affected Python tests for PR automation edits. The `.gv-dependencies.yaml`
+files in `scripts/` and `scripts/tests/` describe the modules loaded by filename and the
+workflow YAML read by the label tests. To reproduce selection from the repository root with
+`pytest-selective==1.9.1` installed, run
+`python -m pytest --rootdir=. --selective --selective-base=origin/main scripts/tests`.
+Use `python -I -m unittest discover -s scripts/tests` for the full suite.
+
 ## Baseline
 
 When no record matches, `python3 scripts/ci-cache-get.py --baseline origin/main` (after
@@ -45,7 +60,7 @@ baseline. `python3 -I scripts/tests/test_ci_cache_baseline.py` tests the selecti
 ## CI
 
 Pull requests land through GitHub's merge queue. `.github/workflows/build.yml` has one job,
-`lake build`, the queue's required check. It builds every pull request to `main` from a fork on
+`lake build`, the queue's required check. It checks every pull request to `main` from a fork on
 the self-hosted `rh-pr-fork` runners, every pull request from a branch of this repository not
 starting with `batch/` on the self-hosted `rh-pr-trusted` runners, and every merge queue group
 (`merge_group`), push to `main`, manual run and pull request from a `batch/` branch of this

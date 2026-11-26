@@ -69,16 +69,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 1 }}
           persist-credentials: false
 
-      - name: Check whether the merge queue has built this commit
-        # The merge queue moves main to the exact commit it built, and that build's artifact is
-        # what gets published, so the push build of that commit has nothing left to do.
+      - name: Select PR checks or reuse the merge queue build on push
         id: queue
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -I scripts/ci-github.py queue-tested --sha "$GITHUB_SHA"
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            python3 -I scripts/ci-github.py pr-checks --sha "$BASE"
+          else
+            python3 -I scripts/ci-github.py queue-tested --sha "$GITHUB_SHA"
+          fi
+
+      - name: Test the CI scripts
+        if: steps.queue.outputs.tests != 'none' && (github.event_name == 'pull_request' || steps.queue.outputs.tested != 'true')
+        env:
+          TESTS: ${{ steps.queue.outputs.tests }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$TESTS" == affected || "$TESTS" == policy ]]; then
+            # The manifests describe filename-based imports and workflow reads.
+            # The full suite uses only the standard library and works offline.
+            envdir="$RUNNER_TEMP/script-tests"
+            if python3 -m venv "$envdir" && "$envdir/bin/python" -m pip install --disable-pip-version-check 'pytest-selective==1.9.1'; then
+              if [[ "$TESTS" == policy ]]; then
+                # Plan once to validate the declarations, then run the full suite.
+                "$envdir/bin/python" -I -m pytest -q --rootdir=. --selective --selective-base="$BASE" --collect-only scripts/tests
+                exec "$envdir/bin/python" -I -m unittest discover -s scripts/tests
+              fi
+              exec "$envdir/bin/python" -I -m pytest -q --rootdir=. --selective --selective-base="$BASE" scripts/tests
+            fi
+            if [[ "$TESTS" == policy ]]; then
+              echo "::error::Validating changed dependency declarations requires pytest-selective"
+              exit 1
+            fi
+            echo "::warning::Selector unavailable; running every script test"
+          fi
+          python3 -I -m unittest discover -s scripts/tests
 
       - name: Fetch main's history for the cache baseline
         if: steps.queue.outputs.tested != 'true'
@@ -94,10 +125,6 @@ jobs:
           rm elan-init.sh
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           "$HOME/.elan/bin/lake" --version
-
-      - name: Test the cache baseline selection
-        if: steps.queue.outputs.tested != 'true'
-        run: python3 -I scripts/tests/test_ci_cache_baseline.py
 
       - name: Restore Mathlib's cache
         if: steps.queue.outputs.tested != 'true'
