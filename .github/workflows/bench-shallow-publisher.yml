@@ -1,0 +1,78 @@
+name: Replay cache verification
+on:
+  push:
+    branches: [codex/bench-shallow-publisher]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        depth: [0, 1]
+        sha: [c5451bd3ba92480e05c4218f5221bb2900c58706, 884e2d0174803658e0acfbf795410576892d140f]
+    steps:
+      - name: Check out main's publishing code
+        uses: actions/checkout@v4
+        with:
+          repository: leanprover-community/riemann-hypothesis
+          ref: c5451bd3ba92480e05c4218f5221bb2900c58706
+          persist-credentials: false
+          fetch-depth: ${{ matrix.depth }}
+
+      - name: Choose the commit
+        id: target
+        env:
+          SHA: ${{ matrix.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::sha must be a full commit hash"; exit 1; }
+          git cat-file -e "$SHA^{commit}" 2>/dev/null || {
+            if [[ "${{ matrix.depth }}" == 1 ]]; then
+              git fetch --no-tags --depth=1 origin "$SHA"
+            else
+              git fetch --no-tags origin "$SHA"
+            fi
+          }
+          test "$(git rev-parse HEAD)" = c5451bd3ba92480e05c4218f5221bb2900c58706
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Find the build of the commit
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.target.outputs.sha }}
+          RUN_ID: ''
+        run: |
+          env GITHUB_REPOSITORY=leanprover-community/riemann-hypothesis python3 -I scripts/ci-github.py find-run --sha "$SHA" ${RUN_ID:+--run-id "$RUN_ID"} \
+            --wait-minutes ${{ github.event_name == 'push' && 90 || 0 }}
+
+      - name: Download its cache outputs
+        uses: actions/download-artifact@v4
+        with:
+          repository: leanprover-community/riemann-hypothesis
+          name: ${{ steps.run.outputs.artifact }}
+          run-id: ${{ steps.run.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/staging
+
+      - name: Install elan and the commit's toolchain
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          toolchain=$(git show "$SHA:lean-toolchain" | tr -d '[:space:]')
+          [[ "$toolchain" =~ ^leanprover/lean4:v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || {
+            echo "::error::unexpected toolchain $toolchain"; exit 1; }
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none --no-modify-path
+          "$HOME/.elan/bin/elan" toolchain install "$toolchain"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Verify, then publish
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/staging/artifacts"
+          python3 -I scripts/publish-ci-cache.py --sha "$SHA" --staging "$RUNNER_TEMP/staging"
