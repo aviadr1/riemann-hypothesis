@@ -282,9 +282,14 @@ lemma sum_ite_lt_sub_two_mul (x A : ℤ) (n : ℕ) :
 lemma sum_ite_lt_add_two_mul (x A : ℤ) (n : ℕ) :
     ∑ b : Fin n, (if x < A + 2 * b then 1 else 0 : ℤ) =
       max 0 (min (n : ℤ) ((A + 2 * n - 1 - x) / 2)) := by
-  induction n with
-  | zero => simp
-  | succ n ih => grind [Fin.sum_univ_castSucc]
+  -- Read the rising block backwards, starting at `A + 2 * n - 2`.
+  rw [← Equiv.sum_comp (Fin.revPerm (n := n))]
+  have h_rev (b : Fin n) : A + 2 * (b.rev : ℤ) = A + 2 * n - 2 - 2 * b := by
+    have hb := b.isLt
+    simp only [Fin.val_rev]
+    omega
+  have h_floor : (A + 2 * n - 2 + 1 - x : ℤ) = A + 2 * n - 1 - x := by omega
+  simp only [Fin.revPerm_apply, h_rev, sum_ite_lt_sub_two_mul, h_floor]
 
 /-- Two blocks with step `2` and the same centre `c`, of lengths `n + 1` and `n`, interlace. The
 left side is the number of entries above `x` of the longer block, less that of the shorter one. It
