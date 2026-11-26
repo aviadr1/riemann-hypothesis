@@ -1,0 +1,66 @@
+name: Lake fixture dependency probe
+on:
+  push:
+    branches: [codex/lake-fixture-deps]
+permissions:
+  contents: read
+jobs:
+  fixture-deps:
+    name: Verify fixture dependencies against Lean's tracked files
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: leanprover/lean4
+          ref: 28858e4e004b58c6b6858cd82861345d1f302af0
+          persist-credentials: false
+          sparse-checkout: tests/lake
+      - name: Check shared and test-specific fixture edges
+        run: |
+          python3 -m venv "$RUNNER_TEMP/fixture-probe"
+          "$RUNNER_TEMP/fixture-probe/bin/pip" install 'selective-deps>=1.9,<2'
+          "$RUNNER_TEMP/fixture-probe/bin/python" - <<'PY'
+          import subprocess
+
+          from selective_deps import dependency_edges, file_of
+
+          revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          files = set(subprocess.check_output(["git", "ls-files", "-z"], text=True).rstrip("\0").split("\0"))
+          manifest = "tests/lake/tests/.gv-dependencies.yaml"
+          files.add(manifest)
+          declarations = b"""dependencies:
+            - readers: [setupFile/test.sh, cache/test.sh]
+              inputs: [common.sh]
+              reason: Both tests source the shared test helpers.
+            - readers: [setupFile/test.sh]
+              inputs: ["//tests/lake/examples/hello/Hello.lean", setupFile/moreServerOptions.toml]
+              kind: content
+              reason: The setup-file command reads the example and the server options as fixtures.
+            - readers: [cache/test.sh]
+              inputs: [cache/services.toml]
+              kind: content
+              reason: The cache test uses the TOML file as its system configuration.
+          """
+          edges = dependency_edges({manifest: declarations}, files, revision=revision)
+          expected_readers = {
+              "tests/lake/examples/hello/Hello.lean": {"tests/lake/tests/setupFile/test.sh"},
+              "tests/lake/tests/setupFile/moreServerOptions.toml": {"tests/lake/tests/setupFile/test.sh"},
+              "tests/lake/tests/cache/services.toml": {"tests/lake/tests/cache/test.sh"},
+              "tests/lake/tests/common.sh": {"tests/lake/tests/cache/test.sh", "tests/lake/tests/setupFile/test.sh"},
+          }
+          for changed, expected in expected_readers.items():
+              readers = {reader for reader, dependencies in edges.items() if changed in map(file_of, dependencies)}
+              assert readers == expected, (changed, readers, expected)
+              print(f"{changed} -> {', '.join(sorted(readers))}")
+          PY
+  run-link:
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=success -f context='Lake fixture dependencies / run link' \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
