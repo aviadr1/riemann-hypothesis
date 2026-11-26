@@ -49,7 +49,8 @@ jobs:
           sed -i 's/allVisited metaVisited : NameSet/allVisited metaVisited : Std.HashSet Name/' "$mod"
           diff -u "$RUNNER_TEMP/baseline/Lake/Build/Module.lean" "$mod" || test "$?" -eq 1
           for variant in baseline candidate; do
-            lake -d "$RUNNER_TEMP/$variant" build lake
+            lake -d "$RUNNER_TEMP/$variant" build Lake lake
+            test -s "$RUNNER_TEMP/$variant/.lake/build/lib/lean/Lake.olean"
             "$RUNNER_TEMP/$variant/.lake/build/bin/lake" self-check
           done
       - name: Measure both binaries against identical cached modules
