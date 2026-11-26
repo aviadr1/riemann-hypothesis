@@ -99,8 +99,15 @@ jobs:
         if: steps.queue.outputs.tested != 'true'
         run: python3 -I scripts/tests/test_ci_cache_baseline.py
 
-      - name: Restore Mathlib's cache
+      - name: Restore prehydrated Lean dependencies
         if: steps.queue.outputs.tested != 'true'
+        id: packages
+        uses: gigaverse-app/ci-esta/actions/restore-lean-packages@a1278dc2c71b7df5583a3d40ecbe9e0b1414f249
+        with:
+          seed-directory: /opt/rh-runner/lean-seed
+
+      - name: Restore Mathlib's cache
+        if: steps.queue.outputs.tested != 'true' && steps.packages.outputs.cache-hit != 'true'
         # As in scripts/lake-cache-get.sh, which `lake exe cache get` runs.
         env:
           MATHLIB_CACHE_GET_URL: https://cache.mathlib.org/mathlib4
