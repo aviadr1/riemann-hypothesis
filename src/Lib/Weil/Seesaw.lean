@@ -116,12 +116,12 @@ abbrev pairTransposedLift (S : Space E n s) (T : Space E n' s') (a b : AutChar E
 datum of the polynomial P and Ψ mod 𝔪. It is a chosen linear map (`formLift`) that equals the lift
 integral whenever the lifts are forms of type e′. -/
 abbrev modLift (e : GInf E s → ℂ) (e' : GInf E s' → ℂ) : S.Form e →ₗ[ℂ] T.Form e' :=
-  pairLift S T (a n) (a n') P Ψ e e'
+  delta% pairLift S T (a n) (a n') P Ψ e e'
 
 /-- The transposed lift of forms of type e′ on T to forms of type e on S, for the same kernel and
 datum as `New.Exchange.modLift`. No complex conjugation enters. -/
 abbrev modTransposedLift (e' : GInf E s' → ℂ) (e : GInf E s → ℂ) : T.Form e' →ₗ[ℂ] S.Form e :=
-  pairTransposedLift S T (a n) (a n') P Ψ e' e
+  delta% pairTransposedLift S T (a n) (a n') P Ψ e' e
 
 variable {S T P Ψ} {I : Type*} (a : I → ∀ (n : Type) [Fintype n], AutChar E)
   (k : Bool → GInf E s → ℂ) (k' : Bool → GInf E s' → ℂ)

@@ -530,7 +530,7 @@ lemma pointTransposedLift_eq_sum {ϑ : D.MFoldTwist} {z : Bool} {b : ℕ} :
     (modDatum_factor (gridModulus_ideal_le_triangleModulus_ideal ϑ z)
       (pointDatum (triangleModulus z ϑ).ResidueRing) v).symm.trans
       (modDatum_eq_sum (D.gridSpace 0 z 0 b) (D.gridSpace 0 z 0 (b + 1)) (edgePointDatum z b) v)
-  dsimp only [pointTransposedLift, modTransposedLift, pairTransposedLift]
+  dsimp only [pointTransposedLift, modTransposedLift]
   rw [h_datum, map_sum]
   simp only [map_smul]
   rfl

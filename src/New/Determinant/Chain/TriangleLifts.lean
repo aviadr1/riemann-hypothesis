@@ -96,7 +96,7 @@ lemma Exchange.modTransposedLift_eq_sum (α : ∀ (M : Type) [Fintype M], AutCha
     (e' : GInf E s' → ℂ) (e : GInf E s → ℂ) (y : T.Form e') :
     modTransposedLift S T α Φ Ψ e' e y =
       ∑ x : Matrix N' N 𝔪.ResidueRing, Ψ x • modTransposedLift S T α Φ (Pi.single x 1) e' e y := by
-  rw [modTransposedLift, pairTransposedLift, modDatum_eq_sum]
+  rw [modTransposedLift, modDatum_eq_sum]
   simp
 
 /-- The theta lift of a function `y`, with finite datum `Ψ` modulo `𝔪` and polynomial `Φ` at
@@ -204,8 +204,7 @@ theorem Exchange.IsEdgeFamily.exists_inner_modLift_eq_inner_modTransposedLift
     _ = ⟪(c * conj κ) • modTransposedLift S.neg T b Φ' Ψ₀ (k' false) (typeKernel l (-s)) x,
       y'⟫ := by
         rw [h_trade, inner_smul_left, map_mul, conj_conj, mul_assoc]
-    _ = _ := by
-      simp [b, y', modTransposedLift, pairTransposedLift, modDatum, Pi.smul_comp, smul_smul]
+    _ = _ := by simp [b, y', modTransposedLift, modDatum, Pi.smul_comp, smul_smul]
 
 namespace Data
 
