@@ -204,8 +204,8 @@ structure DescentPair extends LevelPlaces E where
 variable {E r n} in
 open scoped Classical in
 /-- The point-form datum for residue matrices `X`. When `X` agrees with `Y` at the chosen places,
-it is the product of the tame characters on the determinants of the rows `e` at the twist places.
-It is zero otherwise. -/
+it is the product of `O.tamePart w` on the determinants of the rows `e` at the twist places.
+Here `O.tamePart w` is the character of the residue field at `w`. The datum is zero otherwise. -/
 noncomputable def Rows.pointFormDatum {O : DescentPair E r n}
     (Y : ∀ i : O.ChosenIndex, Matrix n r (ResField (O.placeAt (Sum.inl i)))) (e : r ↪ n)
     (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex, Matrix n r (ResField (O.placeAt i))) : ℂ :=
@@ -230,6 +230,7 @@ abbrev levelGroup : Subgroup (Gf E n) := levelOf O.placeAt
 places and the rows indexed by `O.incl`. -/
 def residueBlockDatum (X : ∀ i : O.ChosenIndex ⊕ O.TwistIndex,
   Matrix n r (ResField (O.placeAt i))) : ℂ :=
+  -- Preserve the unfolded conditional for proofs using `residueBlockDatum`.
   delta% Rows.pointFormDatum (O := O)
     (fun i ↦ inclMatrix (ResField (O.placeAt (inl i))) O.incl) O.incl X
 
