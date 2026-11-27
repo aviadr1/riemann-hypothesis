@@ -72,6 +72,7 @@ noncomputable def TestFunction.clopenIndicator {Y : Type} [TopologicalSpace Y] {
 /-- The characteristic function of a compact open subgroup. -/
 noncomputable def TestFunction.indicator {K : Subgroup G} (hK_open : IsOpen (K : Set G))
     (hK_compact : IsCompact (K : Set G)) : TestFunction G :=
+  -- Keep the characteristic function visible when proofs unfold `indicator`.
   delta% TestFunction.clopenIndicator ⟨K.isClosed_of_isOpen hK_open, hK_open⟩ hK_compact
 
 /-- The linear map `a ↦ a ⋆ 1_K` from the group algebra to the test functions, for a compact open
