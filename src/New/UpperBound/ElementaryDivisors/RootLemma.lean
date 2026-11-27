@@ -349,6 +349,7 @@ lemma var_cases (z : Fin k × ZMod N) : z = D.varY D.letter ∨ z = D.varX D.let
   by_cases hz : D.IsFixed z
   · exact .inr (.inr (.inr hz))
   have h_letter : z = D.varY z.2 ∨ z = D.varX z.2 := by
+    -- The parity of this letter determines which of the two root coordinates is `varX`.
     unfold IsFixed at hz
     by_cases hs : T.isEven z.2 <;> simp [varX, varY, rootVar, hs, Prod.ext_iff] <;> tauto
   by_cases hs : z.2 = D.letter
