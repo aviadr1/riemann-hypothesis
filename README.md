@@ -63,12 +63,13 @@ Contributors can use [dry-lint](https://github.com/gigaverse-app/dry-lint) to fi
 different files under `src/`. From the repository root, run:
 
 ```sh
-uvx --from 'dry-lint[lean]>=1.13,<2' dry-lint scan --limit 20
+uvx --from 'dry-lint[lean]>=1.18,<2' dry-lint scan --limit 20
 ```
 
-To review the declarations changed on a branch, replace `scan --limit 20` with `check --base origin/main`.
-The scan lists candidates for manual review. Check that the hypotheses and conclusions agree and that the
-existing declaration is available at the use site before sharing a proof.
+To review changed declarations, replace `scan --limit 20` with `check --base origin/main`.
+After `lake build`, use `lean-upstream --source-root src --dependency .lake/packages/TauCeti/TauCeti`
+to find Tau Ceti docstrings that cite a local declaration. Compare the hypotheses and conclusions
+and check the replacement with Lean.
 
 ## Layout
 
