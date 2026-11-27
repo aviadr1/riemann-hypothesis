@@ -274,6 +274,8 @@ lemma form_eq_add (hS : ∀ v ∈ D.localPrimes, ↑q ∈ v.asIdeal)
   -- Substitute the values of `z` into `∑ n, ν n (z (γ n)) = 0`.
   simpa [z_val, apply_ite (ν _), sub_eq_iff_eq_add'] using hν z hz
 
+-- The next identities share the hypotheses on split primes indexed by cosets, their tame
+-- generators, and the linear relation among cocycle values at those generators.
 variable (hS : ∀ v ∈ D.localPrimes, ↑q ∈ v.asIdeal)
     {O : OpenNormalSubgroup Gal(Ω/K)} [Fintype (Gal(Ω/K) ⧸ O.toSubgroup)]
     (hO : ∀ g h : Gal(Ω/K), (g : Gal(Ω/K) ⧸ O.toSubgroup) = h →
