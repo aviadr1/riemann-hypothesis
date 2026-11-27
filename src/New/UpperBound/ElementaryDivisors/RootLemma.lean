@@ -560,25 +560,9 @@ lemma polyAction_swapTransvection_X [NeZero N] {T : FrobeniusCycle N W R} (D : T
   -- Off the diagonal, the column of `z` has only the entry `D.sign z * r`, in the row of `X_s`.
   have h_entry (b : Fin k) : M b z.1 =
       (if b = z.1 then 1 else 0) + if (b, z.2) = D.varX z.2 then D.sign z * r else 0 := by
-    cases h_letter : T.isEven D.letter <;> cases h_z : T.isEven z.2
-    · simp only [h_z, Bool.false_eq_true, ↓reduceIte, transvection, Matrix.single, eq_comm,
-        hx, h_letter, transpose_add, transpose_one, transpose_of, Matrix.add_apply,
-        Matrix.one_apply, of_apply, Function.swap, and_comm, varX, rootVar, Prod.ext_iff,
-        true_and, sign, varY, Int.reduceNeg, Int.cast_ite, Int.cast_neg, Int.cast_one,
-        Int.cast_zero, ite_mul, neg_mul, one_mul, zero_mul, ← ite_and, M]
-    · simp only [h_z, ↓reduceIte, transvection, Matrix.single, eq_comm, hx, h_letter,
-        Bool.false_eq_true, Matrix.add_apply, Matrix.one_apply, of_apply, varX, rootVar,
-        Prod.ext_iff, and_comm, true_and, sign, varY, Int.cast_ite, Int.cast_one,
-        Int.cast_zero, ite_mul, one_mul, zero_mul, ← ite_and, M]
-    · simp only [h_z, Bool.false_eq_true, ↓reduceIte, transvection, Matrix.single, eq_comm,
-        hx, h_letter, neg_neg, transpose_add, transpose_one, transpose_of, Matrix.add_apply,
-        Matrix.one_apply, of_apply, Function.swap, and_comm, varX, rootVar, Prod.ext_iff,
-        true_and, sign, varY, Int.cast_ite, Int.cast_one, Int.cast_zero, ite_mul, one_mul,
-        zero_mul, ← ite_and, M]
-    · simp only [h_z, ↓reduceIte, transvection, Matrix.single, eq_comm, hx, h_letter,
-        Matrix.add_apply, Matrix.one_apply, of_apply, varX, rootVar, Prod.ext_iff, and_comm,
-        true_and, sign, varY, Int.reduceNeg, Int.cast_ite, Int.cast_neg, Int.cast_one,
-        Int.cast_zero, ite_mul, neg_mul, one_mul, zero_mul, ← ite_and, M]
+    cases h_letter : T.isEven D.letter <;> cases h_z : T.isEven z.2 <;>
+      simp [M, transvection, Matrix.single, Matrix.one_apply, hx, h_letter, h_z, varX, varY,
+        rootVar, sign, Function.swap, Prod.ext_iff, eq_comm, and_comm, ← ite_and, ite_mul]
   rw [swapTransvection, map_mul, AlgHom.mul_apply, h_diag, map_zsmul, h_column,
     ← swapVar_varX, swapVar, swapVar]
   simp only [h_entry, Prod.ext_iff, varX_snd, and_true, map_add, apply_ite (T.embedding _),
