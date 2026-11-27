@@ -203,10 +203,12 @@ cache:
   otherwise none of its cached oleans match;
 - stops if `src/Statements.lean`, `src/Main.lean` or `Challenge.lean` imports a Tau Ceti module,
   so that the five statements keep depending on Mathlib alone;
-- checks whether the currently imported modules are up to date and, if needed, downloads
+- checks whether the Tau Ceti modules that `src` needs are up to date and, if not, downloads
   Tau Ceti's mappings for the pinned revision (about 135 MB the first time);
-- runs `lake build` on the Tau Ceti modules imported under `src`, which downloads exactly the
-  oleans they need into `.lake/packages/TauCeti`.
+- runs `lake build` on the Tau Ceti modules imported under `src` together with every Tau Ceti
+  module they import in turn, publicly or privately, which downloads exactly those oleans into
+  `.lake/packages/TauCeti`. Lake restores a cached module without the modules it imports only
+  privately, but a later `lake build --no-build` checks them too.
 
 After adding an import of a new Tau Ceti module, rerun `lake exe cache get`; otherwise Lake
 compiles that module and its Tau Ceti dependencies from source. The Tau Ceti and Mathlib pins move
