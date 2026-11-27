@@ -460,17 +460,7 @@ lemma defectWeight_eq [NeZero N] {T : FrobeniusCycle N W R} (D : T.RootAt k) (z 
     if z = D.varX z.2 then (T.P : ℝ) ^ (z.2 - D.letter).val else 0) / (D.card - 1) = _
   rw [one_add_val_sub_one_sub, zeroOrder, poleOrder]
   congr 1
-  split_ifs
-  · simp only [cast_pow, card, frobPower, cast_mul, ne_eq, pow_eq_zero_iff', cast_eq_zero,
-      T.prime.ne_zero, false_and, not_false_eq_true, mul_div_cancel_left₀]
-  · simp only [cast_pow, sub_zero, card, cast_zero, zero_div]
-  · simp only [cast_pow, sub_self, frobPower, card, cast_mul, ne_eq, pow_eq_zero_iff',
-      cast_eq_zero, T.prime.ne_zero, false_and, not_false_eq_true, mul_div_cancel_left₀]
-  · simp only [cast_pow, sub_zero, frobPower, cast_zero, zero_div]
-  · simp only [cast_pow, zero_sub, cast_zero, card, frobPower, cast_mul, ne_eq,
-      pow_eq_zero_iff', cast_eq_zero, T.prime.ne_zero, false_and, not_false_eq_true,
-      mul_div_cancel_left₀]
-  · simp only [sub_self, cast_zero, card, cast_pow, zero_div]
+  split_ifs <;> simp [card, frobPower, T.prime.ne_zero]
 
 /-- The matrix `!![0, 1; -1, x]` in the rows and columns `a`, `a'`, with `x = -r` if `i` is even and
 `x = r` otherwise, written as a transposition times a transvection times the diagonal matrix with
